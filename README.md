@@ -1,3 +1,3 @@
-# cap_3
-
-新的框架
+# inputGen
+***
+This project implemented for generate multiple inputs of the test multi-threaded program.
