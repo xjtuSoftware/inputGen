@@ -100,7 +100,6 @@ void klee_init_env(int* argcPtr, char*** argvPtr) {
   int k=0, i;
 
   sym_arg_name[4] = '\0';
-/*
   // Recognize --help when it is the sole argument.
   if (argc == 2 && __streq(argv[1], "--help")) {
   __emit_error("klee_init_env\n\n\
@@ -182,7 +181,7 @@ usage: (klee_init_env) [options] [program arguments]\n\
       __add_arg(&new_argc, new_argv, argv[k++], 1024);
     }
   }
-*/
+
   final_argv = (char**) malloc((new_argc+1) * sizeof(*final_argv));
   klee_mark_global(final_argv);
   memcpy(final_argv, new_argv, new_argc * sizeof(*final_argv));
@@ -190,10 +189,10 @@ usage: (klee_init_env) [options] [program arguments]\n\
 
   *argcPtr = new_argc;
   *argvPtr = final_argv;
-/*
+
   klee_init_fds(sym_files, sym_file_len, 
 		sym_stdout_flag, save_all_writes_flag, 
 		fd_fail);
-*/
+
 }
 

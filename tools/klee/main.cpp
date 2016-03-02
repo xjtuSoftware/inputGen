@@ -1200,11 +1200,11 @@ int main(int argc, char **argv, char **envp) {
 
 	//WithPOSIXRuntime insert function klee_init_env.
 	//comment it out.
-	if (WithPOSIXRuntime) {
-		int r = initEnv(mainModule);
-		if (r != 0)
-			return r;
-	}
+//	if (WithPOSIXRuntime) {
+//		int r = initEnv(mainModule);
+//		if (r != 0)
+//			return r;
+//	}
 
 	std::string LibraryDir = KleeHandler::getRunTimeLibraryPath(argv[0],
 			reinterpret_cast<void*>(main));
