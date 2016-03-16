@@ -54,6 +54,7 @@
 #include <llvm/Support/Debug.h>
 
 #include <sstream>
+#include <string.h>
 
 using namespace llvm;
 using namespace klee;
@@ -500,8 +501,8 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
 
   /* Build shadow structures */
 
-  infos = new InstructionInfoTable(module);  
-  
+  infos = new InstructionInfoTable(module);
+
   for (Module::iterator it = module->begin(), ie = module->end();
        it != ie; ++it) {
     if (it->isDeclaration())
@@ -600,6 +601,16 @@ KFunction::KFunction(llvm::Function *_function,
   instructions = new KInstruction*[numInstructions];
 
   std::map<Instruction*, unsigned> registerMap;
+/***********************************
+ * insert my own handle functions, mark true and(or) false branch
+ * has global variables.
+ */
+  for (llvm::Function::iterator mybbit = function->begin(),
+		  mybbie = function->end(); mybbit != mybbie; mybbit++) {
+	  for (llvm::BasicBlock::iterator myit = mybbit->begin(), myie = mybbit->end();
+			  myit != myie; myit++) {
+	  }
+  }
 
   // The first arg_size() registers are reserved for formals.
   unsigned rnum = numArgs;

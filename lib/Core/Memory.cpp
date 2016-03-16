@@ -241,6 +241,7 @@ const UpdateList &ObjectState::getUpdates() const {
 
     // Start a new update list.
     // FIXME: Leaked.
+    try {
     static unsigned id = 0;
     std::cerr << "sizeof Array : " << sizeof(Array) << ", size = " <<
     		size << ", constants size = " << Contents.size() << std::endl;
@@ -254,6 +255,9 @@ const UpdateList &ObjectState::getUpdates() const {
     // Apply the remaining (non-constant) writes.
     for (; Begin != End; ++Begin)
       updates.extend(Writes[Begin].first, Writes[Begin].second);
+    } catch (std::bad_alloc & e) {
+    	std::cerr << "bad_alloc in exception catch." << e.what() << std::endl;
+    }
   }
 
   return updates;
@@ -415,7 +419,7 @@ ref<Expr> ObjectState::read8(unsigned offset) const {
     return knownSymbolics[offset];
   } else {
     assert(isByteFlushed(offset) && "unflushed byte without cache value");
-    
+
     return ReadExpr::create(getUpdates(), 
                             ConstantExpr::create(offset, Expr::Int32));
   }    
@@ -434,7 +438,7 @@ ref<Expr> ObjectState::read8(ref<Expr> offset) const {
                       size,
                       allocInfo.c_str());
   }
-  std::cerr << "Read Expression before.\n";
+//  std::cerr << "Read Expression before.\n";
   return ReadExpr::create(getUpdates(), ZExtExpr::create(offset, Expr::Int32));
 }
 
@@ -497,8 +501,8 @@ ref<Expr> ObjectState::read(ref<Expr> offset, Expr::Width width) const {
   for (unsigned i = 0; i != NumBytes; ++i) {
     unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
     ref<Expr> temp = AddExpr::create(offset, ConstantExpr::create(idx, Expr::Int32));
-    std::cerr << "temp = ";
-    temp->dump();
+//    std::cerr << "temp = ";
+//    temp->dump();
     ref<Expr> Byte = read8(AddExpr::create(offset, 
                                            ConstantExpr::create(idx, 
                                                                 Expr::Int32)));
@@ -512,7 +516,6 @@ ref<Expr> ObjectState::read(unsigned offset, Expr::Width width) const {
   // Treat bool specially, it is the only non-byte sized write we allow.
   if (width == Expr::Bool)
     return ExtractExpr::create(read8(offset), 0, Expr::Bool);
-
   // Otherwise, follow the slow general case.
   unsigned NumBytes = width / 8;
   assert(width == NumBytes * 8 && "Invalid write size!");

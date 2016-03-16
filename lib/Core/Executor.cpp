@@ -78,13 +78,14 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <cxxabi.h>
+#include <ctype.h>
 
 using namespace std;
 using namespace llvm;
 using namespace klee;
 
 #define CONSTANT 0
-#define PRINT_RUNTIMEINFO 0
+#define PRINT_RUNTIMEINFO 1
 
 #ifdef SUPPORT_METASMT
 
@@ -245,6 +246,8 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih) :
 		isPrefixFinished(false),
 		prefix(NULL),
 		inputGen(false),
+		headSentinel(NULL),
+		currTreeNode(NULL),
 		//isExecutionSuccess(true),
 		executionNum(0),
 		execStatus(SUCCESS) {
@@ -2069,8 +2072,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 
 	case Instruction::Load: {
 		ref<Expr> base = eval(ki, 0, thread).value;
-		std::cerr<<"base : ";
-		base->dump();
 		executeMemoryOperation(state, false, base, 0, ki);
 		break;
 	}
@@ -3085,7 +3086,7 @@ void Executor::run(ExecutionState &initialState) {
 		stepInstruction(state);
 
 		listenerService->executeInstruction(state, ki);
-		ki->inst->dump();
+//		ki->inst->dump();
 		executeInstruction(state, ki);
 
 		listenerService->instructionExecuted(state, ki);
@@ -3748,17 +3749,14 @@ void Executor::executeMemoryOperation(ExecutionState &state, bool isWrite,
 					wos->write(offset, value);
 				}
 			} else {
-				std::cerr << "Load result begin read.\n";
 				ref<Expr> result = os->read(offset, type);
-		        std::cerr << "Load result : ";
-		        result->dump();
 //				if (os->isFloat) {
 //					std::cerr << "result.get() = " << mo->id << "_" << mo->address << " ";
 //										result.get()->dump();
 //					result.get()->isFloat = true;
 //				}
 				if (interpreterOpts.MakeConcreteSymbolic) {
-					std::cerr << "interpreter options.\n";
+//					std::cerr << "interpreter options.\n";
 					result = replaceReadWithSymbolic(state, result);
 				}
 				bindLocal(target, state.currentThread, result);
@@ -3905,7 +3903,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 		char **envp) {
 	std::vector<ref<Expr> > arguments;
 
-	std::cerr << "run function as main execute.\n";
 	// force deterministic initialization of memory objects
 	srand(1);
 	srandom(1);
@@ -3946,6 +3943,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 	}
 	ExecutionState *state;
 	if (prefix) {
+		std::cerr << "prefix :" << prefix << std::endl;
 		state = new ExecutionState(kmodule->functionMap[f], prefix);
 	} else {
 		state = new ExecutionState(kmodule->functionMap[f]);
@@ -3964,7 +3962,7 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 
 	if (argvMO) {
 		ObjectState *argvOS = bindObjectInState(*state, argvMO, false);
-
+		stringstream ss;
 		for (int i = 0; i < argc + 1 + envc + 1 + 1; i++) {
 			if (i == argc || i >= argc + 1 + envc) {
 				// Write NULL pointer
@@ -3973,18 +3971,29 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 				char *s = i < argc ? argv[i] : envp[i - (argc + 1)];
 				int j, len = strlen(s);
 
-				char sym_arg_name[5] = "arg";
-				sym_arg_name[4] = '\0';
-
 //        MemoryObject *arg = memory->allocate(len+1, false, true, state->currentThread->pc->inst);
 //        arg->isArg = 1;
 				MemoryObject *arg = memory->allocate(len + 1, true, false,
 						state->currentThread->pc->inst);
 				ObjectState *os = bindObjectInState(*state, arg, false);
 				if (inputGen && (i != 0 && i < argc)) {
-					sym_arg_name[3] = '0' + (i - 1);
-					executeMakeSymbolic(*state, arg, sym_arg_name);
-					std::cerr << "execute make symbolic input generate.\n";
+//					executeMakeSymbolic(*state, arg, sym_arg_name);
+//					std::cerr << "execute make symbolic input generate.\n";
+					addressAndSize.insert(make_pair(arg->address,
+							arg->address + sizeof(char) * (len + 1)));
+					for (int t = 0; t < len; t++) {
+						std::stringstream ss;
+						ss << "argv[" << i << "][" << t << "]";
+						std::string name = ss.str();
+//						std::cerr << "argv name : " << name << std::endl;
+						charInfo.insert(make_pair(name, '\0'));
+						ref<Expr> symbolic = manualMakeSymbolic(*state, name, 8, false);
+						argvSymbolics.insert(symbolic);
+						os->write8(t, symbolic);
+						ss.clear();
+						ss.str("");
+					}
+					os->write8(len, s[len]);
 				} else {
 				for (j = 0; j < len + 1; j++)
 					os->write8(j, s[j]);
@@ -3995,8 +4004,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 			}
 		}
 	}
-
-	std::cerr << "initialization execution.\n";
 	initializeGlobals(*state);
 
 //  processTree = new PTree(state);
@@ -4495,7 +4502,7 @@ void Executor::handleInitializers(ExecutionState& initialState) {
 			Type* type = i->getInitializer()->getType();
 			ConstantExpr* address = globalAddresses.find(i)->second.get();
 			uint64_t startAddress = address->getZExtValue();
-			std::cerr << "initializer name : " << i->getInitializer()->hasName() << std::endl;
+//			std::cerr << "initializer name : " << i->getInitializer()->hasName() << std::endl;
 			createSpecialElement(initialState, type, startAddress, true);
 		}
 	}
@@ -4644,9 +4651,14 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type,
 //}
 void Executor::runVerification(llvm::Function *f, int argc, char **argv,
 		char **envp) {
+	listenerService->preparation(this);
 	while (!isFinished && execStatus != RUNTIMEERROR) {
 		execStatus = SUCCESS;
 		listenerService->startControl(this);
+		listenerService->changeInputAndPrefix(argc, argv, this);
+		for (int i = 0; i < argc; i++) {
+			std::cerr << "argv " << i << ":" << argv[i] << std::endl;
+		}
 		runFunctionAsMain(f, argc, argv, envp);
 		listenerService->endControl(this);
 		prepareNextExecution();
@@ -4674,7 +4686,10 @@ void Executor::getNewPrefix() {
 		this->prefix = prefix;
 		isFinished = false;
 	} else {
-		isFinished = true;
+		if (listenerService->getRuntimeDataManager()->symbolicInputPrefix.size() == 0)
+			isFinished = true;
+		else
+			listenerService->getRuntimeDataManager()->runState = 0;
 #if PRINT_RUNTIMEINFO
 		printPrefix();
 #endif
@@ -4778,3 +4793,26 @@ void Executor::printPrefix() {
 		//prefix->print(cerr);
 	}
 }
+
+ref<Expr> Executor::manualMakeSymbolic(ExecutionState& state,
+		std::string name, unsigned size, bool isFloat) {
+
+	//添加新的符号变量
+	const Array *array = new Array(name, size, isFloat);
+	ObjectState *os = new ObjectState(size, array);
+	ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
+	ref<Expr> result = os->read(offset, size);
+	if (isFloat) {
+		result.get()->isFloat = true;
+	}
+#if DEBUGSYMBOLIC
+	cerr << "Event name : " << (*currentEvent)->eventName << "\n";
+	cerr << "make symboic:" << name << std::endl;
+	cerr << "is float:" << isFloat << std::endl;
+	std::cerr << "result : ";
+	result->dump();
+	std::cerr << "symbolic result : " << result << std::endl;
+#endif
+	return result;
+}
+

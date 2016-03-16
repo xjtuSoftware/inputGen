@@ -38,6 +38,9 @@ namespace klee {
     /// Destination register index.
     unsigned dest;
 
+    bool trueBlockHasGlobal;
+    bool falseBlockHasGlobal;
+
   public:
     virtual ~KInstruction(); 
   };

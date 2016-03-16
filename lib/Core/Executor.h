@@ -222,12 +222,19 @@ private:
 	bool inputGen; //variable inputGen guide to execute inputGenListener
 	//basic node data structure
 
+	std::map<unsigned long long, unsigned long long> addressAndSize; //useless, may delete.
+	std::set<ref<Expr> > argvSymbolics;
+	std::map<std::string, char> charInfo;
+
 	typedef struct binTree {
-		binTree():next(0), size(0), isSwitch(0) {}
+		binTree():next(0), size(0), isSwitch(0),brTrue(0), currEvent(NULL) {}
 		std::vector<ref<Expr> > vecExpr;
+		ref<Expr> switchValue;
 		struct binTree * next;
 		unsigned size;
 		bool isSwitch;
+		bool brTrue;
+		Event* currEvent;
 	}BinTree;
 	BinTree * headSentinel;
 	BinTree * currTreeNode;
@@ -573,6 +580,13 @@ public:
 	void printInstrcution(ExecutionState &state, KInstruction* ki);
 
 	void printPrefix();
+
+	ref<Expr> manualMakeSymbolic(ExecutionState& state,
+			std::string name, unsigned size, bool isFloat);
+
+	void setIsFinished() {
+		isFinished = true;
+	}
 };
 
 } // End klee namespace

@@ -577,6 +577,12 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 	}
 
 	case Instruction::ICmp: {
+		ICmpInst* icmp = cast<ICmpInst>(inst);
+//		std::cerr << "PSOListener.\n";
+//		icmp->dump();
+//		icmp->getOperand(0)->dump();
+//		icmp->getOperand(1)->dump();
+//		std::cerr << "PSOListener end.\n";
 		break;
 	}
 
@@ -868,8 +874,12 @@ void PSOListener::afterRunMethodAsMain() {
 	} else if (!rdManager->isCurrentTraceUntested()) {
 		rdManager->getCurrentTrace()->traceType = Trace::REDUNDANT;
 		cerr << "######################本条路径为旧路径####################\n";
-		executor->getNewPrefix();
+//		executor->getNewPrefix();
+		if (rdManager->symbolicInputPrefix.size() == 0)
+			executor->setIsFinished();
+		rdManager->runState = 0;
 	} else {
+		std::cerr << "PSOListener after run function as main.\n";
 		rdManager->runState = 1;
 		std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
 		std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
@@ -886,7 +896,6 @@ void PSOListener::afterRunMethodAsMain() {
 		}
 		rdManager->allGlobal += allGlobal;
 	}
-
 }
 
 
@@ -1000,8 +1009,8 @@ void PSOListener::handleInitializer(Constant* initializer, MemoryObject* mo,
 		}
 	} else if (ConstantStruct* cstruct = dyn_cast<ConstantStruct>(
 			initializer)) {
-		std::cerr << "print in ConstantStruct\n";
-		cstruct->dump();
+//		std::cerr << "print in ConstantStruct\n";
+//		cstruct->dump();
 		StructType* structType = cstruct->getType();
 		if (structType->hasName() &&
 				(structType->getStructName() == "union.pthread_mutex_t"
@@ -1020,7 +1029,7 @@ void PSOListener::handleInitializer(Constant* initializer, MemoryObject* mo,
 				handleInitializer(element, mo, startAddress);
 			}
 		}
-		std::cerr << "bug in this block?\n";
+//		std::cerr << "bug in this block?\n";
 	} else if (ConstantPointerNull* cpoint = dyn_cast<ConstantPointerNull>(
 			initializer)) {
 		Type* type = cpoint->getType();
@@ -1046,6 +1055,7 @@ void PSOListener::handleInitializer(Constant* initializer, MemoryObject* mo,
 		//undefined value is unspecified, so it has not initializer.
 		//just execute running.
 	}else {
+		initializer->dump();
 		cerr << "value = " << initializer->getValueID() << " type = "
 				<< initializer->getType()->getTypeID() << endl;
 		assert(0 && "unsupported initializer");
@@ -1210,6 +1220,10 @@ void PSOListener::handleExternalFunction(ExecutionState& state,
 		executor->getMemoryObject(op, state, address);
 		uint64_t start = dyn_cast<ConstantExpr>(address)->getZExtValue();
 		analyzeInputValue(start, op, type);
+	} else if (f->getName() == "strlen") {
+		Thread* thread = state.currentThread;
+		ref<Expr> retValue = executor->getDestCell(thread, ki).value;
+		lastEvent->value.push_back(retValue);
 	}
 
 }

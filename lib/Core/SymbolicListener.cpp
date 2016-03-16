@@ -599,6 +599,7 @@ ref<Expr> SymbolicListener::manualMakeSymbolic(ExecutionState& state,
 	cerr << "is float:" << isFloat << std::endl;
 	std::cerr << "result : ";
 	result->dump();
+	std::cerr << "symbolic result : " << result << std::endl;
 #endif
 	return result;
 }

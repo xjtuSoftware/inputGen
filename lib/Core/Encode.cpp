@@ -93,6 +93,10 @@ void Encode::buildAllFormula() {
 	//
 }
 
+void Encode::buildInputNeedFormula() {
+	//need complemented
+}
+
 //true :: assert can't be violated. false :: assert can be violated.
 bool Encode::verify() {
 #if FORMULA_DEBUG
@@ -192,6 +196,16 @@ bool Encode::verify() {
 						ss.str());
 				output << "./output_info/" << prefix->getName() << ".z3expr";
 				runtimeData->addScheduleSet(prefix);
+
+				//added by LIU Pei
+				std::vector<std::string> vecArgvs;
+				char *p = runtimeData->pArgv[0];
+				while (p) {
+					vecArgvs.push_back(std::string(p));
+					p++;
+				}
+				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
+
 //			} else {
 				cerr << "Assert Failure at "
 						<< assertFormula[i].first->inst->info->file << ": "
@@ -372,6 +386,16 @@ void Encode::check_if() {
 				runtimeData->addScheduleSet(prefix);
 				runtimeData->satBranch++;
 				runtimeData->satCost += cost;
+
+				//added by LIU Pei
+				std::vector<std::string> vecArgvs;
+				char *p = runtimeData->pArgv[0];
+				while (p) {
+					vecArgvs.push_back(std::string(p));
+					p++;
+				}
+				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
+
 #if FORMULA_DEBUG
 				showPrefixInfo(prefix, ifFormula[i].first);
 #endif
@@ -475,6 +499,7 @@ void Encode::computePrefix(vector<Event*>& vecEvent, Event* ifEvent) {
 			stringstream ss;
 			ss << m.eval(it->second);
 			long order = atoi(ss.str().c_str());
+
 			//cut off segment behind the negated branch
 			if (order > ifEventOrder)
 				continue;

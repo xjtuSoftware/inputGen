@@ -21,6 +21,9 @@ private:
 	std::set<Trace*> testedTraceList; // traces which have been examined
 	std::list<Prefix*> scheduleSet; // prefixes which have not been examined
 
+
+	//first: main input, second: prefix executed to negated branch.
+
 public:
 	//newly added stastic info
 	unsigned allFormulaNum;
@@ -35,7 +38,12 @@ public:
 	double satCost;
 	double unSatCost;
 
+	char **pArgv;
+
 	unsigned runState;
+
+//	std::map<std::vector<std::string>, Prefix*> symbolicInputPrefix;
+	std::map<Prefix*, std::vector<std::string> > symbolicInputPrefix;
 
 	RuntimeDataManager();
 	virtual ~RuntimeDataManager();

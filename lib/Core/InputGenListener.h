@@ -13,6 +13,8 @@
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "DealWithSymbolicExpr.h"
+#include "Event.h"
+#include "Encode.h"
 
 namespace klee {
 
@@ -38,6 +40,13 @@ public:
 			std::string name, unsigned size, bool isFloat);
 
 	void inputGen(SearchType searchType);
+	void makeBasicArgvConstraint(std::set<ref<Expr> > &argvSymbolics,
+			std::vector<ref<Expr> > &constraints);
+
+	void getArgvResult();
+	void insertInputPrefix(Encode& encode,
+			std::map<std::string, char>& charInfo, Event* event);
+	void getPrefixFromPath(std::vector<Event*>&, Event*);
 
 private:
 	Executor *executor;
@@ -54,6 +63,9 @@ private:
 
 	void DFSGenInput(Executor::BinTree *, std::vector<ref<Expr> >&);
 	void BFSGenInput(Executor::BinTree *);
+	void negateEachBr(Executor::BinTree*, std::vector<ref<Expr> >&);
+	void getSolveResult(std::vector<ref<Expr> >&, Executor::BinTree*);
+	void freeMemoryBinTree(Executor::BinTree*);
 
 };
 

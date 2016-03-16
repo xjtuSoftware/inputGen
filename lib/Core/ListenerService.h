@@ -24,6 +24,9 @@ private:
 	unsigned runState;
 	struct timeval start, finish;
 
+	bool basicBlockOpGlobal(llvm::BasicBlock *basicBlock);
+	bool funcOpGlobal(std::set<std::string>&, llvm::Function *);
+
 
 public:
 	ListenerService(Executor* executor);
@@ -34,7 +37,7 @@ public:
 
 	RuntimeDataManager* getRuntimeDataManager();
 
-	void Preparation();
+	void preparation(Executor* executor);
 	void beforeRunMethodAsMain(ExecutionState &initialState);
 	void executeInstruction(ExecutionState &state, KInstruction *ki);
 	void instructionExecuted(ExecutionState &state, KInstruction *ki);
@@ -47,6 +50,10 @@ public:
 
 	void startControl(Executor* executor);
 	void endControl(Executor* executor);
+
+	void changeInputAndPrefix(int argc, char **argv, Executor* executor);
+
+	std::set<std::string> globalVarNameSet;
 };
 
 }

@@ -220,6 +220,7 @@ ref<Expr> Expr::createFromKind(Kind k, std::vector<CreateArg> args) {
     case Read:
     default:
       assert(0 && "invalid kind");
+      break;
 
     case NotOptimized:
       assert(numArgs == 1 && args[0].isExpr() &&
@@ -504,10 +505,6 @@ ref<Expr> ReadExpr::create(const UpdateList &ul, ref<Expr> index) {
   // optimizations when the index has changed, and the other is 
   // initial creation, where we expect the ObjectState to have constructed
   // a smart UpdateList so it is not worth rescanning.
-
-	std::cerr << "read expression create.\n";
-	std::cerr << "root name : " << ul.root->name << std::endl;
-	index->dump();
 
   const UpdateNode *un = ul.head;
   for (; un; un=un->next) {

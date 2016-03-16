@@ -380,6 +380,8 @@ DEBUG_WITH_TYPE("klee_linker", dbgs() << "Linking file " << libraryName << "\n")
     Result = ParseBitcodeFile(Buffer.get(), Context, &ErrorMessage);
 
 
+//    std::cerr << "module of result : " << std::endl;
+//    Result->dump();
     if (!Result || Linker::LinkModules(module, Result, Linker::DestroySource,
         &ErrorMessage))
       klee_error("Link with library %s failed: %s", libraryName.c_str(),

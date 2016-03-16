@@ -8,6 +8,9 @@
 #ifndef LIB_CORE_LISTENERSERVICE_C_
 #define LIB_CORE_LISTENERSERVICE_C_
 
+#include "llvm/Support/InstIterator.h"
+#include "llvm/IR/Module.h"
+
 #include "ListenerService.h"
 #include "PSOListener.h"
 #include "SymbolicListener.h"
@@ -94,13 +97,14 @@ void ListenerService::startControl(Executor* executor){
 		pushListener(listener);
 		executor->executionNum++;
 		gettimeofday(&start, NULL);
+		std::cerr << "PSOListener execute.\n";
 		break;
 	}
 	case 1: {
 		BitcodeListener* listener = new SymbolicListener(executor, &rdManager);
 		pushListener(listener);
-		rdManager.runState = 2;
 		if (executor->prefix) {
+			std::cerr << "executor->prefix symbolic listener:" << executor->prefix << "\n";
 			executor->prefix->reuse();
 		}
 		gettimeofday(&start, NULL);
@@ -110,7 +114,9 @@ void ListenerService::startControl(Executor* executor){
 	case 2: {
 		BitcodeListener * listener = new InputGenListener(executor, &rdManager);
 		pushListener(listener);
-		rdManager.runState = 0;
+		if (executor->prefix) {
+			executor->prefix->reuse();
+		}
 		executor->inputGen = true;
 		std::cerr << "InputGenListener execute \n";
 		break;
@@ -135,6 +141,7 @@ void ListenerService::endControl(Executor* executor){
 		// complete Def-Use coverage computing.
 		// don't need do anything else.
 		popListener();
+		rdManager.runState = 2;
 /****************
 		//comment out to execute the input generate listener.
 		Encode encode(&rdManager);
@@ -152,8 +159,11 @@ void ListenerService::endControl(Executor* executor){
 	}
 	case 2: {
 		popListener();
+		rdManager.runState = 0;
 		//temporally exit exe
-		executor->isFinished = true;
+//		executor->isFinished = true;
+		executor->inputGen = false;
+		executor->argvSymbolics.clear();
 		break;
 	}
 	default: {
@@ -161,6 +171,163 @@ void ListenerService::endControl(Executor* executor){
 	}
 	}
 
+}
+
+void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* executor) {
+	if (rdManager.runState == 0 && rdManager.symbolicInputPrefix.size() != 0) {
+		std::map<Prefix*, std::vector<std::string> >::iterator it =
+				rdManager.symbolicInputPrefix.begin();
+		executor->prefix = it->first;
+		std::cerr << "get prefix in run verification : " << executor->prefix << std::endl;
+		int i = 1;
+		std::vector<std::string>::size_type cnt = it->second.size();
+		assert((argc - 1) == cnt && "the number of computed argv is not equal argc");
+		int vecSize = it->second.size();
+		std::cerr << "vec size = " << vecSize << std::endl;
+		for (unsigned j = 0; j < vecSize; j++) {
+			unsigned t = 0;
+//			std::cerr << "j = " << j << std::endl;
+			for (; t < it->second[j].size(); t++)
+				argv[i][t] = it->second[j][t];
+			argv[i][t] = '\0';
+//			std::cerr << "change argv : " << argv[i] << std::endl;
+			i++;
+		}
+//		std::cerr << "i = " << i << std::endl;
+//		argv[i][0] = '\0';
+//		std::cerr << "change input prefix i = " << i << std::endl;
+		std::cerr << "before erase : " << rdManager.symbolicInputPrefix.size() << std::endl;
+		rdManager.symbolicInputPrefix.erase(it->first);
+		std::cerr << "after erase : " << rdManager.symbolicInputPrefix.size() << std::endl;
+	}
+	rdManager.pArgv = argv;
+}
+
+void ListenerService::preparation(Executor *executor) {
+	//get global variable name;
+	for (Module::const_global_iterator ci = executor->kmodule->module->global_begin(),
+			ce = executor->kmodule->module->global_end(); ci != ce; ci++) {
+		std::string varName = ci->getName().str();
+
+		if (varName[0] != '.') {
+			globalVarNameSet.insert(varName);
+			std::cerr << "var name : " << varName << std::endl;
+		}
+	}
+
+	for (std::vector<KFunction*>::iterator it = executor->kmodule->functions.begin(),
+			ie = executor->kmodule->functions.end(); it != ie; it++) {
+		KInstruction **instructions = (*it)->instructions;
+		for (unsigned i = 0; i < (*it)->numInstructions; i++) {
+			KInstruction *ki = instructions[i];
+			Instruction *inst = ki->inst;
+
+			if (inst->getOpcode() == Instruction::Br) {
+				BranchInst *bi = cast<BranchInst>(inst);
+				if (bi->isUnconditional())
+					continue;
+				BranchInst::op_iterator opit = bi->op_begin(), opie = bi->op_end();
+				opit++;
+				for (; opit != opie; opit++) {
+					if (strncmp((*opit)->getName().str().c_str(), "if.then", 7) == 0) {
+						ki->trueBlockHasGlobal = basicBlockOpGlobal((BasicBlock*)(opit->get()));
+						if (ki->trueBlockHasGlobal) {
+							inst->dump();
+							std::cerr << " then block has global vars." << ki->info->line << std::endl;
+						}
+					}
+					if (strncmp((*opit)->getName().str().c_str(), "if.else", 7) == 0) {
+						ki->falseBlockHasGlobal = basicBlockOpGlobal((BasicBlock*)(opit->get()));
+						if (ki->falseBlockHasGlobal) {
+							inst->dump();
+							std::cerr << " else block has global vars." << ki->info->line << std::endl;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+
+bool ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock) {
+	bool ret = false;
+	for (BasicBlock::iterator bit = basicBlock->begin(), bie = basicBlock->end();
+			bit != bie; bit++) {
+		if (bit->getOpcode() == Instruction::Load) {
+			std::string varName = bit->getOperand(0)->getName().str();
+			if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
+				ret = true;
+				break;
+			}
+		} else if (bit->getOpcode() == Instruction::Store) {
+			std::string var1 = bit->getOperand(0)->getName().str();
+			std::string var2 = bit->getOperand(1)->getName().str();
+			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
+				ret = true;
+				break;
+			}
+			if (var2 != "" && globalVarNameSet.find(var2) != globalVarNameSet.end()) {
+				ret = true;
+				break;
+			}
+		}else if (bit->getOpcode() == Instruction::Br) {
+				 BranchInst *bi = cast<BranchInst>(bit);
+			if (bi->isUnconditional())
+				continue;
+			BranchInst::op_iterator opit = bi->op_begin(), opie = bi->op_end();
+			opit++;
+			for (; opit != opie; opit++) {
+				 if (strncmp((*opit)->getName().str().c_str(), "if.then", 7) == 0 ||
+						 strncmp((*opit)->getName().str().c_str(), "if.else", 7) == 0) {
+					 ret = basicBlockOpGlobal((BasicBlock*)(opit->get()));
+				}
+			}
+		} else if (bit->getOpcode() == Instruction::Call) {
+			CallInst* ci = cast<CallInst>(bit);
+			Function* func = ci->getCalledFunction();
+			std::set<std::string> funcNameSet;
+			if (!func->isDeclaration())
+				ret = funcOpGlobal(funcNameSet, func);
+		}
+	}
+	return ret;
+}
+
+bool ListenerService::funcOpGlobal(std::set<std::string> &funcNameSet, llvm::Function *func) {
+	std::string funcName = func->getName().str();
+	if (funcNameSet.size() > 0 && funcNameSet.find(funcName) == funcNameSet.end())
+		return false;
+	bool ret = false;
+	funcNameSet.insert(funcName);
+	for (inst_iterator it = inst_begin(func), ie = inst_end(func); it != ie; it++) {
+		Instruction *inst = &*it;
+		if (inst->getOpcode() == Instruction::Load) {
+			std::string varName = inst->getOperand(0)->getName().str();
+			if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
+				ret = true;
+				break;
+			}
+		} else if (inst->getOpcode() == Instruction::Store) {
+			std::string var1 = inst->getOperand(0)->getName().str();
+			std::string var2 = inst->getOperand(1)->getName().str();
+			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
+				ret = true;
+				break;
+			}
+			if (var2 != "" && globalVarNameSet.find(var2) != globalVarNameSet.end()) {
+				ret = true;
+				break;
+			}
+		} else if (inst->getOpcode() == Instruction::Call) {
+			CallInst* ci = cast<CallInst>(inst);
+			Function* func = ci->getCalledFunction();
+			if (!func->isDeclaration()) {
+				ret = funcOpGlobal(funcNameSet, func);
+			}
+		}
+	}
+	return ret;
 }
 
 }

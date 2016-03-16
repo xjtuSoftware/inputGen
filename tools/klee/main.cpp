@@ -1225,6 +1225,8 @@ int main(int argc, char **argv, char **envp) {
 #else
 		llvm::sys::path::append(Path, "libklee-libc.bca");
 #endif
+		std::cerr << "klee libc : " << Path.c_str() <<
+			", library directory : " << Opts.LibraryDir	<< std::endl;
 		mainModule = klee::linkWithLibrary(mainModule, Path.c_str());
 		assert(mainModule && "unable to link with klee-libc");
 		break;
@@ -1414,7 +1416,7 @@ int main(int argc, char **argv, char **envp) {
 			}
 		}
 		//interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
-		mainModule->dump();
+//		mainModule->dump();
 		interpreter->runVerification(mainFn, pArgc, pArgv, pEnvp);
 		while (!seeds.empty()) {
 			kTest_free(seeds.back());

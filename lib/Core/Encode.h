@@ -34,10 +34,11 @@ private:
 	DealWithSymbolicExpr filter;
 	unsigned formulaNum;
 	unsigned solvingTimes;
+	Event* branchPoint;
 
 public:
 	Encode(RuntimeDataManager* data) :
-			runtimeData(data), z3_solver(z3_ctx) {
+			runtimeData(data), z3_solver(z3_ctx), branchPoint(NULL) {
 		trace = data->getCurrentTrace();
 		formulaNum = 0;
 		solvingTimes = 0;
@@ -47,6 +48,7 @@ public:
 		runtimeData->solvingTimes += solvingTimes;
 	}
 	void buildAllFormula();
+	void buildInputNeedFormula();
 	void buildifAndassert();
 	void showInitTrace();
 	void check_output();
