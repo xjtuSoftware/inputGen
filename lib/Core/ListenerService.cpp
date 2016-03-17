@@ -104,7 +104,6 @@ void ListenerService::startControl(Executor* executor){
 		BitcodeListener* listener = new SymbolicListener(executor, &rdManager);
 		pushListener(listener);
 		if (executor->prefix) {
-			std::cerr << "executor->prefix symbolic listener:" << executor->prefix << "\n";
 			executor->prefix->reuse();
 		}
 		gettimeofday(&start, NULL);
@@ -140,25 +139,25 @@ void ListenerService::endControl(Executor* executor){
 	case 1: {
 		// complete Def-Use coverage computing.
 		// don't need do anything else.
+		//specific input multi-interleaving
 		popListener();
 		rdManager.runState = 2;
-/****************
 		//comment out to execute the input generate listener.
 		Encode encode(&rdManager);
 		encode.buildifAndassert();
 		if (encode.verify()) {
 			encode.check_if();
 		}
-		executor->getNewPrefix();
+//		executor->getNewPrefix();
 		gettimeofday(&finish, NULL);
 		double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec
 				- start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
 		rdManager.solvingCost += cost;
-***************************/
 		break;
 	}
 	case 2: {
 		popListener();
+		//get multi-inputs;
 		rdManager.runState = 0;
 		//temporally exit exe
 //		executor->isFinished = true;
@@ -178,12 +177,10 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 		std::map<Prefix*, std::vector<std::string> >::iterator it =
 				rdManager.symbolicInputPrefix.begin();
 		executor->prefix = it->first;
-		std::cerr << "get prefix in run verification : " << executor->prefix << std::endl;
 		int i = 1;
 		std::vector<std::string>::size_type cnt = it->second.size();
 		assert((argc - 1) == cnt && "the number of computed argv is not equal argc");
 		int vecSize = it->second.size();
-		std::cerr << "vec size = " << vecSize << std::endl;
 		for (unsigned j = 0; j < vecSize; j++) {
 			unsigned t = 0;
 //			std::cerr << "j = " << j << std::endl;
@@ -193,12 +190,17 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 //			std::cerr << "change argv : " << argv[i] << std::endl;
 			i++;
 		}
+		std::map<Prefix*, std::map<std::string, unsigned> >::iterator mit =
+				rdManager.intInputPrefix.begin();
+		assert(mit->first == it->first && "not the same prefix.\n");
+		rdManager.intArgv.clear();
+		std::map<std::string, unsigned> tempMap = mit->second;
+		rdManager.intArgv.insert(tempMap.begin(), tempMap.end());
+		rdManager.intInputPrefix.erase(mit->first);
 //		std::cerr << "i = " << i << std::endl;
 //		argv[i][0] = '\0';
 //		std::cerr << "change input prefix i = " << i << std::endl;
-		std::cerr << "before erase : " << rdManager.symbolicInputPrefix.size() << std::endl;
 		rdManager.symbolicInputPrefix.erase(it->first);
-		std::cerr << "after erase : " << rdManager.symbolicInputPrefix.size() << std::endl;
 	}
 	rdManager.pArgv = argv;
 }
@@ -256,6 +258,8 @@ bool ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock) {
 			bit != bie; bit++) {
 		if (bit->getOpcode() == Instruction::Load) {
 			std::string varName = bit->getOperand(0)->getName().str();
+//			bit->dump();
+//			std::cerr << "Load operand 0 value id = " << bit->getOperand(0)->getValueID() << std::endl;
 			if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
 				ret = true;
 				break;
@@ -263,6 +267,7 @@ bool ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock) {
 		} else if (bit->getOpcode() == Instruction::Store) {
 			std::string var1 = bit->getOperand(0)->getName().str();
 			std::string var2 = bit->getOperand(1)->getName().str();
+			std::cerr << "var1 = " << var1 << ", var2 = " << var2 << std::endl;
 			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
 				ret = true;
 				break;

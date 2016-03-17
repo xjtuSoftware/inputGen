@@ -147,6 +147,7 @@ namespace klee {
     HANDLER(handlePThreadBarrierDestory);
     HANDLER(handlePThreadSelf);
     HANDLER(handleValloc);
+    HANDLER(handleIntInputs);
 #undef HANDLER
   };
 } // End klee namespace

@@ -59,7 +59,7 @@
 #include "Common.h"
 #include "KQuery2Z3.h"
 
-#define FORMULA_DEBUG 1
+#define FORMULA_DEBUG 0
 #define BRANCH_INFO 1
 #define BUFFERSIZE 300
 #define BIT_WIDTH 64
@@ -204,8 +204,11 @@ bool Encode::verify() {
 					vecArgvs.push_back(std::string(p));
 					p++;
 				}
-				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
+				std::map<std::string, unsigned> tempMap;
+				tempMap.insert(runtimeData->intArgv.begin(), runtimeData->intArgv.end());
 
+				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
+				runtimeData->intInputPrefix.insert(make_pair(prefix, tempMap));
 //			} else {
 				cerr << "Assert Failure at "
 						<< assertFormula[i].first->inst->info->file << ": "
@@ -394,7 +397,10 @@ void Encode::check_if() {
 					vecArgvs.push_back(std::string(p));
 					p++;
 				}
+				std::map<std::string, unsigned> tempMap;
+				tempMap.insert(runtimeData->intArgv.begin(), runtimeData->intArgv.end());
 				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
+				runtimeData->intInputPrefix.insert(make_pair(prefix, tempMap));
 
 #if FORMULA_DEBUG
 				showPrefixInfo(prefix, ifFormula[i].first);

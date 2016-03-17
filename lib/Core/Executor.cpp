@@ -3943,7 +3943,6 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 	}
 	ExecutionState *state;
 	if (prefix) {
-		std::cerr << "prefix :" << prefix << std::endl;
 		state = new ExecutionState(kmodule->functionMap[f], prefix);
 	} else {
 		state = new ExecutionState(kmodule->functionMap[f]);
@@ -4656,9 +4655,9 @@ void Executor::runVerification(llvm::Function *f, int argc, char **argv,
 		execStatus = SUCCESS;
 		listenerService->startControl(this);
 		listenerService->changeInputAndPrefix(argc, argv, this);
-		for (int i = 0; i < argc; i++) {
-			std::cerr << "argv " << i << ":" << argv[i] << std::endl;
-		}
+//		for (int i = 0; i < argc; i++) {
+//			std::cerr << "argv " << i << ":" << argv[i] << std::endl;
+//		}
 		runFunctionAsMain(f, argc, argv, envp);
 		listenerService->endControl(this);
 		prepareNextExecution();

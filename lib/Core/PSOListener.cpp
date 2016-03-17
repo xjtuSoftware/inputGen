@@ -457,6 +457,55 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		} else if (kmodule->kleeFunctions.find(f)
 				!= kmodule->kleeFunctions.end()) {
 			item->eventType = Event::IGNORE;
+		} else if (f->getName().str() == "implAtoI") {
+			if (executor->executionNum == 1) {
+				//insert to the map of intArgv.
+				unsigned argsNum = inst->getNumOperands();
+				for (unsigned i = 0; i < (argsNum - 1); i++) {
+					ref<Expr> address = executor->eval(ki, i + 1, thread).value;
+					std::string varName = inst->getOperand(i)->getName().str();
+					ObjectPair op;
+					bool success = executor->getMemoryObject(op, state, address);
+					if (success) {
+						const ObjectState *os = op.second;
+						ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
+						ref<Expr> exprValue = os->read(offset, 8);
+						if (ConstantExpr *ce = dyn_cast<ConstantExpr>(exprValue)) {
+							unsigned intValue = ce->getZExtValue();
+							rdManager->intArgv.insert(make_pair(varName, intValue));
+						} else {
+							assert(0 && "the value in int argv is not a integer value(if).\n");
+						}
+					} else {
+						assert(0 && "cannot get the corresponding op in PSOListener.\n");
+					}
+				}
+			} else {
+				//change the value of int argvs in on the running on three listener.
+				unsigned argsNum = inst->getNumOperands();
+				for (unsigned i = 0; i < (argsNum - 1); i++) {
+					ref<Expr> address = executor->eval(ki, i + 1, thread).value;
+					std::string varName = inst->getOperand(i)->getName().str();
+					std::map<std::string, unsigned>::iterator it =
+							rdManager->intArgv.find(varName);
+					if (it == rdManager->intArgv.end()) {
+						assert(0 && "cannot find the real value "
+								"in the  runtime data manager intArgv.\n");
+					}
+					ObjectPair op;
+					bool success = executor->getMemoryObject(op, state, address);
+					if (success) {
+							const ObjectState *os = op.second;
+							const MemoryObject *mo = op.first;
+							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+							ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
+							ref<Expr> realExpr = ConstantExpr::create(it->second, BIT_WIDTH);
+							wos->write(offset, realExpr);
+					} else {
+						assert(0 && "cannot get the corresponding op in PSOListener(else).\n");
+					}
+				}
+			}
 		}
 		//cerr << item->calledFunction->getName().str() << " " << item->isUserDefinedFunction << endl;
 		break;
@@ -874,9 +923,16 @@ void PSOListener::afterRunMethodAsMain() {
 	} else if (!rdManager->isCurrentTraceUntested()) {
 		rdManager->getCurrentTrace()->traceType = Trace::REDUNDANT;
 		cerr << "######################本条路径为旧路径####################\n";
-//		executor->getNewPrefix();
-		if (rdManager->symbolicInputPrefix.size() == 0)
+		executor->getNewPrefix();
+		//set isFinished attribute, and free the prefix memory.
+		if (rdManager->symbolicInputPrefix.size() == 0) {
 			executor->setIsFinished();
+			Prefix *prefix = rdManager->getNextPrefix();
+			while (prefix) {
+				delete prefix;
+				prefix = NULL;
+			}
+		}
 		rdManager->runState = 0;
 	} else {
 		std::cerr << "PSOListener after run function as main.\n";

@@ -139,6 +139,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 		add("pthread_self", handlePThreadSelf, true),
 
 		add("valloc", handleValloc, true),
+
+		add("implAtoI", handleIntInputs, false),
 #undef addDNR
 #undef add  
 		};
@@ -841,4 +843,11 @@ void SpecialFunctionHandler::handleValloc(ExecutionState &state,
 		KInstruction *target, std::vector<ref<Expr> > &arguments) {
 	assert(arguments.size() == 1 && "invalid number of arguments to valloc");
 	executor.executeAlloc(state, arguments[0], false, target);
+}
+
+void SpecialFunctionHandler::handleIntInputs(ExecutionState &state,
+		KInstruction *target, std::vector<ref<Expr> > &arguments) {
+	//arguments could be zero, that can be used in all tested program.
+	//real handle in InputGenListener, this just for running in the
+	//PSOListener and SymbolicListener.
 }

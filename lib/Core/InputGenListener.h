@@ -40,7 +40,7 @@ public:
 			std::string name, unsigned size, bool isFloat);
 
 	void inputGen(SearchType searchType);
-	void makeBasicArgvConstraint(std::set<ref<Expr> > &argvSymbolics,
+	void makeBasicArgvConstraint(
 			std::vector<ref<Expr> > &constraints);
 
 	void getArgvResult();

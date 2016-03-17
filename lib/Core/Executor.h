@@ -224,6 +224,7 @@ private:
 
 	std::map<unsigned long long, unsigned long long> addressAndSize; //useless, may delete.
 	std::set<ref<Expr> > argvSymbolics;
+	std::set<ref<Expr> > intArgvConstraints;
 	std::map<std::string, char> charInfo;
 
 	typedef struct binTree {

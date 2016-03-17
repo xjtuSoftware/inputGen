@@ -230,8 +230,24 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 						unsigned value = ce->getZExtValue();
 						std::cerr << "the value of strlen is " << value << std::endl;
 					}
-				} else {
+				} else if (f->getName() == "implAtoI"){
+//					std::cerr << "implAtoI : " << inst->getNumOperands() << std::endl;
+					unsigned numArgs = inst->getNumOperands();
+					for (unsigned i = 0; i < (numArgs - 1); i++) {
+						std::string varName = inst->getOperand(i)->getName().str();
+						ref<Expr> address = executor->eval(ki, i + 1, thread).value;
+						//8 bits.
+						unsigned width = 8;
+						ref<Expr> retSym = manualMakeSymbolic(state, varName, width, false);
+						executor->evalAgainst(ki, i + 1, thread, retSym);
+//						executor->eval(ki, i + 1, thread).value->dump();
+						executor->intArgvConstraints.insert(retSym);
 
+						rdManager->intArgv.insert(make_pair(varName, -1));
+
+//						std::cerr << "name : " << inst->getOperand(i)->getName().str() << "\n";
+					}
+//					std::cerr << "print end.\n";
 				}
 			}
 			break;
@@ -305,7 +321,7 @@ void InputGenListener::afterRunMethodAsMain() {
 		printSymbolicNode(head);
 	}
 
-	std::cerr << "input generate calling start.\n";
+//	std::cerr << "input generate calling start.\n";
 	inputGen(InputGenListener::DFS);
 //	if (rdManager->symbolicInputPrefix.size() == 0)
 //		executor->setIsFinished();
@@ -336,7 +352,7 @@ void InputGenListener::inputGen(SearchType type) {
 		//DFS search
 		std::vector<ref<Expr> > constraints;
 		Executor::BinTree * head = executor->headSentinel;
-		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
+//		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
 		negateEachBr(head, constraints);
 //		DFSGenInput(head, constraints);
 		break;
@@ -363,9 +379,7 @@ void InputGenListener::freeMemoryBinTree(Executor::BinTree* head) {
 
 void InputGenListener::negateEachBr(Executor::BinTree* head,
 		std::vector<ref<Expr> >& constraints) {
-	std::cerr << "before constraints in negate : " << constraints.size() << std::endl;
-	makeBasicArgvConstraint(executor->argvSymbolics, constraints);
-	std::cerr << "after constraints in negate : " << constraints.size() << std::endl;
+	makeBasicArgvConstraint(constraints);
 	Executor::BinTree* temp = head;
 	ref<Expr> pushValue = ConstantExpr::create(true, 1);
 	while (temp != NULL) {
@@ -393,19 +407,15 @@ void InputGenListener::negateEachBr(Executor::BinTree* head,
 				lhs = trueExpr;
 			}
 			ref<Expr> constraint = EqExpr::create(lhs, temp->vecExpr[0]);
-			constraint->dump();
 			constraints.push_back(constraint);
-			std::cerr << "constraints size : " << constraints.size() << std::endl;
+//			std::cerr << "constraints size : " << constraints.size() << std::endl;
 			getSolveResult(constraints, temp);
 			constraints.pop_back();
 		}
-		pushValue->dump();
-		std::cerr << "push value: " << std::endl;
 		constraints.push_back(pushValue);
 		temp = temp->next;
 	}
 	//释放由于收集分支信息新建的BinTree
-	std::cerr << "symbolic input size = " << rdManager->symbolicInputPrefix.size() << std::endl;
 	freeMemoryBinTree(head);
 	executor->headSentinel = NULL;
 	executor->currTreeNode = NULL;
@@ -416,21 +426,19 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 	KQuery2Z3 * kq = new KQuery2Z3(z3_ctx);
 	std::vector<ref<Expr> >::iterator it =
 			constraints.begin(), ie = constraints.end();
-	std::cerr << "constraints size = " << constraints.size() << std::endl;
 	//short for push.
 	z3_solver.push();
 	while (it != ie) {
-			(*it)->dump();
+//			(*it)->dump();
 		z3::expr res = kq->getZ3Expr((*it));
 		z3_solver.add(res);
 		it++;
 	}
-	std::cerr << "push complete.\n";
 	check_result result = z3_solver.check();
 	if (result == z3::sat) {
 		std::cerr << "satisfied the constraints in get solve result.\n";
 		model m = z3_solver.get_model();
-		std::cerr << m << std::endl;
+//		std::cerr << m << std::endl;
 		//get every char.
 		std::map<std::string, char>::iterator it =
 				executor->charInfo.begin(), ie = executor->charInfo.end();
@@ -444,6 +452,18 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			char ch = toascii(temp);
 			std::cerr << "temp = " << temp << ", ch = " << ch << std::endl;
 			executor->charInfo[it->first] = ch;
+			sr.str("");
+		}
+		//compute int argvs.
+		std::map<std::string, unsigned>::iterator iit = rdManager->intArgv.begin(),
+				iie = rdManager->intArgv.end();
+		for (; iit != iie; iit++) {
+			z3::expr tempExpr = z3_ctx.bv_const(iit->first.c_str(), BIT_WIDTH);
+			z3::expr realExpr = z3::to_expr(z3_ctx, Z3_mk_bv2int(z3_ctx, tempExpr, false));
+			sr << m.eval(realExpr);
+			std::cerr << "sr = " << sr.str().c_str() << std::endl;
+			int temp = atoi(sr.str().c_str());
+			rdManager->intArgv[iit->first] = (unsigned)temp;
 			sr.str("");
 		}
 		std::cerr << "print the char.\n";
@@ -477,22 +497,19 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		argvStr[i] = '\0';
 		argvValue.push_back(std::string(argvStr));
 
-		std::vector<std::string>::iterator vit = argvValue.begin(),
-				vie = argvValue.end();
-		for (; vit != vie; vit++) {
-			std::cerr << "argv is " << (*vit) << std::endl;
-		}
 		//get prefix and store them in the runtime data manager.
 		std::vector<Event*> vecEvent;
 		getPrefixFromPath(vecEvent, node->currEvent);
 		Prefix* prefix = new Prefix(vecEvent,
 				rdManager->getCurrentTrace()->createThreadPoint, "mapOfInputAndPreix");
-		std::cerr << "create prefix : " << prefix << std::endl;
+		std::map<std::string, unsigned> tempMap;
+		tempMap.insert(rdManager->intArgv.begin(), rdManager->intArgv.end());
 		rdManager->symbolicInputPrefix.insert(make_pair(prefix, argvValue));
+		rdManager->intInputPrefix.insert(make_pair(prefix, tempMap));
 	} else if (result == z3::unsat) {
-		std::cerr << "unsat.\n";
+		std::cerr << "unsat inputGenListener.\n";
 	} else {
-		std::cerr << "unknown.\n";
+		std::cerr << "unknown inputGenListener.\n";
 	}
 	z3_solver.pop();
 	delete kq;
@@ -500,7 +517,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 
 void InputGenListener::DFSGenInput(Executor::BinTree * head, std::vector<ref<Expr> > &constraints) {
 	if (head == NULL) {
-		makeBasicArgvConstraint(executor->argvSymbolics, constraints);
+		makeBasicArgvConstraint(constraints);
 		KQuery2Z3 * kq = new KQuery2Z3(z3_ctx);
 		z3_solver.push();
 		std::vector<ref<Expr> >::iterator it =
@@ -639,16 +656,26 @@ ref<Expr> InputGenListener::manualMakeSymbolic(ExecutionState& state,
 
 
 void InputGenListener::makeBasicArgvConstraint(
-		std::set<ref<Expr> > &argvSymbolics,
 		std::vector<ref<Expr> > &constraints) {
-	std::set<ref<Expr> >::iterator it = argvSymbolics.begin(),
-			ie = argvSymbolics.end();
+	std::set<ref<Expr> >::iterator it = executor->argvSymbolics.begin(),
+			ie = executor->argvSymbolics.end();
 	for (; it != ie; it++) {
 		//ASCII code upper and lower bound in decimal.
 		ref<Expr> lowerBound = ConstantExpr::alloc(33, 8);
 		ref<Expr> upperBound = ConstantExpr::alloc(126, 8);
 		ref<Expr> lhs = UleExpr::create((*it), upperBound);
 		ref<Expr> rhs = UgeExpr::create((*it), lowerBound);
+		constraints.push_back(lhs);
+		constraints.push_back(rhs);
+	}
+
+	std::set<ref<Expr> >::iterator sit = executor->intArgvConstraints.begin(),
+			sie = executor->intArgvConstraints.end();
+	for (; sit != sie; sit++) {
+		ref<Expr> lowerBound = ConstantExpr::alloc(0, 8);
+		ref<Expr> upperBound = ConstantExpr::alloc(255, 8);
+		ref<Expr> lhs = UleExpr::create((*sit), upperBound);
+		ref<Expr> rhs = UgeExpr::create((*sit), lowerBound);
 		constraints.push_back(lhs);
 		constraints.push_back(rhs);
 	}

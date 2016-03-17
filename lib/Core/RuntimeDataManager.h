@@ -42,8 +42,11 @@ public:
 
 	unsigned runState;
 
+
 //	std::map<std::vector<std::string>, Prefix*> symbolicInputPrefix;
 	std::map<Prefix*, std::vector<std::string> > symbolicInputPrefix;
+	std::map<Prefix*, std::map<std::string, unsigned> > intInputPrefix;
+	std::map<std::string, unsigned> intArgv;
 
 	RuntimeDataManager();
 	virtual ~RuntimeDataManager();
