@@ -463,15 +463,19 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				unsigned argsNum = inst->getNumOperands();
 				for (unsigned i = 0; i < (argsNum - 1); i++) {
 					ref<Expr> address = executor->eval(ki, i + 1, thread).value;
+					std::cerr << " execution num address : " << address->getWidth() << std::endl;
 					std::string varName = inst->getOperand(i)->getName().str();
+					Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
+					std::cerr << "implAtoI width = " << width << std::endl;
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, address);
 					if (success) {
 						const ObjectState *os = op.second;
-						ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
-						ref<Expr> exprValue = os->read(offset, 8);
+						ref<Expr> offset = op.first->getOffsetExpr(address);
+						ref<Expr> exprValue = os->read(offset, 8/*if define as char*/);
 						if (ConstantExpr *ce = dyn_cast<ConstantExpr>(exprValue)) {
 							unsigned intValue = ce->getZExtValue();
+							std::cerr << "int value : " << intValue << std::endl;
 							rdManager->intArgv.insert(make_pair(varName, intValue));
 						} else {
 							assert(0 && "the value in int argv is not a integer value(if).\n");
@@ -486,6 +490,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				for (unsigned i = 0; i < (argsNum - 1); i++) {
 					ref<Expr> address = executor->eval(ki, i + 1, thread).value;
 					std::string varName = inst->getOperand(i)->getName().str();
+					Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
 					std::map<std::string, unsigned>::iterator it =
 							rdManager->intArgv.find(varName);
 					if (it == rdManager->intArgv.end()) {
@@ -498,8 +503,8 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 							const ObjectState *os = op.second;
 							const MemoryObject *mo = op.first;
 							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
-							ref<Expr> offset = ConstantExpr::create(0, BIT_WIDTH);
-							ref<Expr> realExpr = ConstantExpr::create(it->second, BIT_WIDTH);
+							ref<Expr> offset = mo->getOffsetExpr(address);
+							ref<Expr> realExpr = ConstantExpr::create(it->second, 8/*define as char*/);
 							wos->write(offset, realExpr);
 					} else {
 						assert(0 && "cannot get the corresponding op in PSOListener(else).\n");

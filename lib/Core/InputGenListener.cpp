@@ -192,6 +192,7 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 	//handle call instruction of functions atoi, strlen and so on.
 	if ((*currentEvent)) {
 		Instruction* inst = ki->inst;
+//		inst->dump();
 		Thread* thread = state.currentThread;
 		switch (inst->getOpcode()) {
 		case Instruction::Call: {
@@ -236,10 +237,21 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 					for (unsigned i = 0; i < (numArgs - 1); i++) {
 						std::string varName = inst->getOperand(i)->getName().str();
 						ref<Expr> address = executor->eval(ki, i + 1, thread).value;
-						//8 bits.
-						unsigned width = 8;
-						ref<Expr> retSym = manualMakeSymbolic(state, varName, width, false);
-						executor->evalAgainst(ki, i + 1, thread, retSym);
+						Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
+
+						//8 bits. the problems in here. 坑
+						ref<Expr> retSym = manualMakeSymbolic(state, varName, 8/*define as char*/, false);
+						ObjectPair op;
+						bool success = executor->getMemoryObject(op, state, address);
+						if (success) {
+							const ObjectState *os = op.second;
+							const MemoryObject *mo = op.first;
+							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+							ref<Expr> offset = mo->getOffsetExpr(address);
+							wos->write(offset, retSym);
+						} else {
+							assert(0 && "can not get the corresponding op in InputGenListener.\n");
+						}
 //						executor->eval(ki, i + 1, thread).value->dump();
 						executor->intArgvConstraints.insert(retSym);
 
@@ -447,7 +459,6 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			z3::expr charExpr = z3_ctx.bv_const(it->first.c_str(), BIT_WIDTH);
 			z3::expr realExpr = z3::to_expr(z3_ctx, Z3_mk_bv2int(z3_ctx, charExpr, false));
 			sr << m.eval(realExpr);
-			std::cerr << "sr = " << sr.str().c_str() << std::endl;
 			int temp = atoi(sr.str().c_str());
 			char ch = toascii(temp);
 			std::cerr << "temp = " << temp << ", ch = " << ch << std::endl;
@@ -463,6 +474,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			sr << m.eval(realExpr);
 			std::cerr << "sr = " << sr.str().c_str() << std::endl;
 			int temp = atoi(sr.str().c_str());
+			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
 			rdManager->intArgv[iit->first] = (unsigned)temp;
 			sr.str("");
 		}
