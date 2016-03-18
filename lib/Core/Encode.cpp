@@ -132,6 +132,12 @@ bool Encode::verify() {
 #endif
 	z3_solver.push();	//backtrack 1
 	cerr << "\nThe number of assert: " << assertFormula.size() << "\n";
+	//added by LIU Pei
+	std::vector<std::string> vecArgvs;
+	int tt = 1;
+	while (tt < runtimeData->iArgc) {
+			vecArgvs.push_back(std::string(runtimeData->pArgv[tt++]));
+	}
 	for (unsigned i = 0; i < assertFormula.size(); i++) {
 #if BRANCH_INFO
 		stringstream ss;
@@ -197,18 +203,10 @@ bool Encode::verify() {
 				output << "./output_info/" << prefix->getName() << ".z3expr";
 				runtimeData->addScheduleSet(prefix);
 
-				//added by LIU Pei
-				std::vector<std::string> vecArgvs;
-				char *p = runtimeData->pArgv[0];
-				while (p) {
-					vecArgvs.push_back(std::string(p));
-					p++;
-				}
-				std::map<std::string, unsigned> tempMap;
-				tempMap.insert(runtimeData->intArgv.begin(), runtimeData->intArgv.end());
 
+//
 				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
-				runtimeData->intInputPrefix.insert(make_pair(prefix, tempMap));
+				runtimeData->intInputPrefix.insert(make_pair(prefix, runtimeData->intArgv));
 //			} else {
 				cerr << "Assert Failure at "
 						<< assertFormula[i].first->inst->info->file << ": "
@@ -247,6 +245,12 @@ void Encode::check_if() {
 	unsigned sum = 0, num = 0;
 	unsigned size = ifFormula.size();
 	cerr << "Sum of branches: " << size << "\n";
+	//added by LIU Pei
+	std::vector<std::string> vecArgvs;
+	int tt = 1;
+	while (tt < runtimeData->iArgc) {
+			vecArgvs.push_back(std::string(runtimeData->pArgv[tt++]));
+	}
 	for (unsigned i = 0; i < ifFormula.size(); i++) {
 		num++;
 #if BRANCH_INFO
@@ -390,17 +394,8 @@ void Encode::check_if() {
 				runtimeData->satBranch++;
 				runtimeData->satCost += cost;
 
-				//added by LIU Pei
-				std::vector<std::string> vecArgvs;
-				char *p = runtimeData->pArgv[0];
-				while (p) {
-					vecArgvs.push_back(std::string(p));
-					p++;
-				}
-				std::map<std::string, unsigned> tempMap;
-				tempMap.insert(runtimeData->intArgv.begin(), runtimeData->intArgv.end());
 				runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
-				runtimeData->intInputPrefix.insert(make_pair(prefix, tempMap));
+				runtimeData->intInputPrefix.insert(make_pair(prefix, runtimeData->intArgv));
 
 #if FORMULA_DEBUG
 				showPrefixInfo(prefix, ifFormula[i].first);

@@ -472,7 +472,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 					if (success) {
 						const ObjectState *os = op.second;
 						ref<Expr> offset = op.first->getOffsetExpr(address);
-						ref<Expr> exprValue = os->read(offset, 8/*if define as char*/);
+						ref<Expr> exprValue = os->read(offset, sizeof(char) * 8/*if define as char*/);
 						if (ConstantExpr *ce = dyn_cast<ConstantExpr>(exprValue)) {
 							unsigned intValue = ce->getZExtValue();
 							std::cerr << "int value : " << intValue << std::endl;
@@ -504,7 +504,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 							const MemoryObject *mo = op.first;
 							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
 							ref<Expr> offset = mo->getOffsetExpr(address);
-							ref<Expr> realExpr = ConstantExpr::create(it->second, 8/*define as char*/);
+							ref<Expr> realExpr = ConstantExpr::create(it->second, sizeof(char) * 8/*define as char*/);
 							wos->write(offset, realExpr);
 					} else {
 						assert(0 && "cannot get the corresponding op in PSOListener(else).\n");
@@ -928,7 +928,7 @@ void PSOListener::afterRunMethodAsMain() {
 	} else if (!rdManager->isCurrentTraceUntested()) {
 		rdManager->getCurrentTrace()->traceType = Trace::REDUNDANT;
 		cerr << "######################本条路径为旧路径####################\n";
-		executor->getNewPrefix();
+//		executor->getNewPrefix();
 		//set isFinished attribute, and free the prefix memory.
 		if (rdManager->symbolicInputPrefix.size() == 0) {
 			executor->setIsFinished();

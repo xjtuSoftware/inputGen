@@ -22,7 +22,7 @@ using namespace llvm;
 namespace klee {
 
 RuntimeDataManager::RuntimeDataManager() :
-		currentTrace(NULL) {
+		currentTrace(NULL), pArgv(NULL), iArgc(0) {
 	// TODO Auto-generated constructor stub
 	traceList.reserve(20);
 	allFormulaNum = 0;

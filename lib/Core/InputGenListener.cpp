@@ -240,7 +240,7 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 						Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
 
 						//8 bits. the problems in here. 坑
-						ref<Expr> retSym = manualMakeSymbolic(state, varName, 8/*define as char*/, false);
+						ref<Expr> retSym = manualMakeSymbolic(state, varName, sizeof(char) * 8/*define as char*/, false);
 						ObjectPair op;
 						bool success = executor->getMemoryObject(op, state, address);
 						if (success) {

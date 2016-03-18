@@ -39,6 +39,7 @@ public:
 	double unSatCost;
 
 	char **pArgv;
+	int iArgc;
 
 	unsigned runState;
 

@@ -203,6 +203,7 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 		rdManager.symbolicInputPrefix.erase(it->first);
 	}
 	rdManager.pArgv = argv;
+	rdManager.iArgc = argc;
 }
 
 void ListenerService::preparation(Executor *executor) {
