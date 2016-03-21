@@ -408,7 +408,7 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 
 void SymbolicListener::instructionExecuted(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = rdManager->getCurrentTrace();
-	ki->inst->dump();
+//	ki->inst->dump();
 	if ((*currentEvent)) {
 		Instruction* inst = ki->inst;
 		Thread* thread = state.currentThread;
@@ -557,8 +557,8 @@ void SymbolicListener::instructionExecuted(ExecutionState &state, KInstruction *
 				}
 //				cerr << "pthread id : " << value << "\n";
 			} else if (f->getName() == "printf") {
-				std::cerr << "printf name : " << std::endl;
-				ki->inst->dump();
+//				std::cerr << "printf name : " << std::endl;
+//				ki->inst->dump();
 			}
 			break;
 		}
