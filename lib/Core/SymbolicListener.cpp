@@ -299,6 +299,36 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 //					(*currentEvent)->value.pop_back();
 				}
 			}
+			Function* f = (*currentEvent)->calledFunction;
+			if (f->getName() == "implAtoI") {
+				//change the value of int argvs in on the running on three listener.
+				unsigned argsNum = inst->getNumOperands();
+				for (unsigned i = 0; i < (argsNum - 1); i++) {
+					ref<Expr> address = executor->eval(ki, i + 1, thread).value;
+					std::string varName = inst->getOperand(i)->getName().str();
+					Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
+					std::map<std::string, unsigned>::iterator it =
+							rdManager->intArgv.find(varName);
+					if (it == rdManager->intArgv.end()) {
+						assert(0 && "cannot find the real value "
+								"in the  runtime data manager intArgv.\n");
+					}
+					ObjectPair op;
+					bool success = executor->getMemoryObject(op, state, address);
+					if (success) {
+							const ObjectState *os = op.second;
+							const MemoryObject *mo = op.first;
+							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
+							ref<Expr> offset = mo->getOffsetExpr(address);
+							ref<Expr> realExpr = ConstantExpr::create(it->second, sizeof(int) * 8);
+							std::cerr << "real expr in write, second = " << it->second << std::endl;
+							realExpr->dump();
+							wos->write(offset, realExpr);
+					} else {
+						assert(0 && "cannot get the corresponding op in PSOListener(else).\n");
+					}
+				}
+			}
 			break;
 		}
 		case Instruction::GetElementPtr: {
@@ -378,6 +408,7 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 
 void SymbolicListener::instructionExecuted(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = rdManager->getCurrentTrace();
+	ki->inst->dump();
 	if ((*currentEvent)) {
 		Instruction* inst = ki->inst;
 		Thread* thread = state.currentThread;
@@ -525,6 +556,9 @@ void SymbolicListener::instructionExecuted(ExecutionState &state, KInstruction *
 					symbolicMap[globalVarFullName] = value;
 				}
 //				cerr << "pthread id : " << value << "\n";
+			} else if (f->getName() == "printf") {
+				std::cerr << "printf name : " << std::endl;
+				ki->inst->dump();
 			}
 			break;
 		}

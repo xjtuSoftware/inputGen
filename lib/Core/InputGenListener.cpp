@@ -240,7 +240,7 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 						Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
 
 						//8 bits. the problems in here. 坑
-						ref<Expr> retSym = manualMakeSymbolic(state, varName, sizeof(char) * 8/*define as char*/, false);
+						ref<Expr> retSym = manualMakeSymbolic(state, varName, sizeof(int) * 8/*define as char*/, false);
 						ObjectPair op;
 						bool success = executor->getMemoryObject(op, state, address);
 						if (success) {
@@ -488,6 +488,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		std::vector<std::string> argvValue;
 		std::map<std::string, char>::iterator mmit = executor->charInfo.begin(),
 				mmie = executor->charInfo.end();
+		if (mmit != mmie) {
 		std::string tempStr = mmit->first;
 		char argvStr[20] = "";
 		int i = 0;
@@ -508,6 +509,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		}
 		argvStr[i] = '\0';
 		argvValue.push_back(std::string(argvStr));
+		}
 
 		//get prefix and store them in the runtime data manager.
 		std::vector<Event*> vecEvent;
@@ -684,8 +686,8 @@ void InputGenListener::makeBasicArgvConstraint(
 	std::set<ref<Expr> >::iterator sit = executor->intArgvConstraints.begin(),
 			sie = executor->intArgvConstraints.end();
 	for (; sit != sie; sit++) {
-		ref<Expr> lowerBound = ConstantExpr::alloc(0, 8);
-		ref<Expr> upperBound = ConstantExpr::alloc(255, 8);
+		ref<Expr> lowerBound = ConstantExpr::alloc(0, sizeof(int) * 8);
+		ref<Expr> upperBound = ConstantExpr::alloc(255, sizeof(int) * 8);
 		ref<Expr> lhs = UleExpr::create((*sit), upperBound);
 		ref<Expr> rhs = UgeExpr::create((*sit), lowerBound);
 		constraints.push_back(lhs);
