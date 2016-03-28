@@ -143,6 +143,7 @@ void ListenerService::endControl(Executor* executor){
 		popListener();
 		rdManager.runState = 2;
 		//comment out to execute the input generate listener.
+		markBrOpGloabl(executor);
 		Encode encode(&rdManager);
 		encode.buildifAndassert();
 		if (encode.verify()) {
@@ -180,7 +181,7 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 		int i = 1;
 		std::vector<std::string>::size_type cnt = it->second.size();
 		assert((argc - 1) == cnt && "the number of computed argv is not equal argc");
-		int vecSize = it->second.size();
+		unsigned int vecSize = it->second.size();
 		for (unsigned j = 0; j < vecSize; j++) {
 			unsigned t = 0;
 //			std::cerr << "j = " << j << std::endl;
@@ -205,6 +206,34 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 	rdManager.pArgv = argv;
 	rdManager.iArgc = argc;
 }
+
+void ListenerService::markBrOpGloabl(Executor *executor) {
+	for (std::vector<KFunction*>::iterator it = executor->kmodule->functions.begin(),
+			ie = executor->kmodule->functions.end(); it != ie; it++) {
+		KInstruction **instructions = (*it)->instructions;
+		for (unsigned i = 0; i < (*it)->numInstructions; i++) {
+			KInstruction *ki = instructions[i];
+			Instruction *inst = ki->inst;
+
+			if (inst->getOpcode() == Instruction::Br) {
+				BranchInst *bi = cast<BranchInst>(inst);
+				if (bi->isUnconditional())
+					continue;
+				BranchInst::op_iterator opit = bi->op_begin(), opie = bi->op_end();
+				opit++;
+				for (; opit != opie; opit++) {
+					if (rdManager.bbOpGlobal.find((llvm::BasicBlock*)(opit->get())) !=
+							rdManager.bbOpGlobal.end()) {
+						ki->operateGlobalVar = true;
+						std::cerr << "operate global variables" << std::endl;
+						ki->inst->dump();
+					}
+				}
+			}
+		}
+	}
+}
+
 
 void ListenerService::preparation(Executor *executor) {
 	//get global variable name;
@@ -232,19 +261,21 @@ void ListenerService::preparation(Executor *executor) {
 				BranchInst::op_iterator opit = bi->op_begin(), opie = bi->op_end();
 				opit++;
 				for (; opit != opie; opit++) {
+					BasicBlock *bb = (BasicBlock*)(opit->get());
 					if (strncmp((*opit)->getName().str().c_str(), "if.then", 7) == 0) {
-						ki->trueBlockHasGlobal = basicBlockOpGlobal((BasicBlock*)(opit->get()));
-						if (ki->trueBlockHasGlobal) {
-							inst->dump();
-							std::cerr << " then block has global vars." << ki->info->line << std::endl;
-						}
+						opit->get()->dump();
+						std::set<std::string> allGvar;
+						ki->trueBT = basicBlockOpGlobal(bb, allGvar);
+						if (ki->trueBT == klee::KInstruction::definite)
+							rdManager.bbOpGVarName.insert(make_pair(bb, allGvar));
+						rdManager.icBB.insert(make_pair((*opit)->getName().str(), bb));
 					}
 					if (strncmp((*opit)->getName().str().c_str(), "if.else", 7) == 0) {
-						ki->falseBlockHasGlobal = basicBlockOpGlobal((BasicBlock*)(opit->get()));
-						if (ki->falseBlockHasGlobal) {
-							inst->dump();
-							std::cerr << " else block has global vars." << ki->info->line << std::endl;
-						}
+						std::set<std::string> allGvar;
+						ki->falseBT = basicBlockOpGlobal(bb, allGvar);
+						if (ki->falseBT == klee::KInstruction::definite)
+							rdManager.bbOpGVarName.insert(make_pair(bb, allGvar));
+						rdManager.icBB.insert(make_pair((*opit)->getName().str(), bb));
 					}
 				}
 			}
@@ -253,83 +284,130 @@ void ListenerService::preparation(Executor *executor) {
 }
 
 
-bool ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock) {
-	bool ret = false;
+KInstruction::BranchType
+ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::string> &allGvar) {
+	KInstruction::BranchType ret = KInstruction::none;
+
 	for (BasicBlock::iterator bit = basicBlock->begin(), bie = basicBlock->end();
 			bit != bie; bit++) {
 		if (bit->getOpcode() == Instruction::Load) {
+			LoadInst *li = dyn_cast<LoadInst>(bit);
 			std::string varName = bit->getOperand(0)->getName().str();
-//			bit->dump();
-//			std::cerr << "Load operand 0 value id = " << bit->getOperand(0)->getValueID() << std::endl;
+
+			if (li->getType()->getTypeID() == Type::PointerTyID) {
+				return klee::KInstruction::possible;
+			}
+
 			if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
-				ret = true;
-				break;
+				allGvar.insert(varName);
+				ret = klee::KInstruction::definite;
 			}
 		} else if (bit->getOpcode() == Instruction::Store) {
 			std::string var1 = bit->getOperand(0)->getName().str();
 			std::string var2 = bit->getOperand(1)->getName().str();
-			std::cerr << "var1 = " << var1 << ", var2 = " << var2 << std::endl;
+
 			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
-				ret = true;
-				break;
+				allGvar.insert(var1);
+				ret = klee::KInstruction::definite;
 			}
 			if (var2 != "" && globalVarNameSet.find(var2) != globalVarNameSet.end()) {
-				ret = true;
-				break;
+				allGvar.insert(var2);
+				ret = klee::KInstruction::definite;
 			}
 		}else if (bit->getOpcode() == Instruction::Br) {
 				 BranchInst *bi = cast<BranchInst>(bit);
 			if (bi->isUnconditional())
 				continue;
-			BranchInst::op_iterator opit = bi->op_begin(), opie = bi->op_end();
+			BranchInst::op_iterator opit = bi->op_begin();
 			opit++;
-			for (; opit != opie; opit++) {
-				 if (strncmp((*opit)->getName().str().c_str(), "if.then", 7) == 0 ||
-						 strncmp((*opit)->getName().str().c_str(), "if.else", 7) == 0) {
-					 ret = basicBlockOpGlobal((BasicBlock*)(opit->get()));
-				}
-			}
+			klee::KInstruction::BranchType ret1 =
+					basicBlockOpGlobal((BasicBlock*)(opit->get()), allGvar);
+			opit++;
+			klee::KInstruction::BranchType ret2 =
+					basicBlockOpGlobal((BasicBlock*)(opit->get()), allGvar);
+			if (ret1 == klee::KInstruction::possible ||
+					ret2 == klee::KInstruction::possible)
+				return klee::KInstruction::possible;
+			if (ret1 == klee::KInstruction::definite ||
+					ret2 == klee::KInstruction::definite)
+				ret = klee::KInstruction::definite;
 		} else if (bit->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(bit);
+			unsigned argvs = ci->getNumArgOperands();
+
+			for (unsigned i = 0; i < argvs; i++) {
+				if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
+					return klee::KInstruction::possible;
+				}
+			}
+
 			Function* func = ci->getCalledFunction();
 			std::set<std::string> funcNameSet;
-			if (!func->isDeclaration())
-				ret = funcOpGlobal(funcNameSet, func);
+
+			if (!func->isDeclaration()) {
+				std::set<std::string> opGVar;
+				klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
+				if (temp == klee::KInstruction::possible)
+					return klee::KInstruction::possible;
+				if (temp == klee::KInstruction::definite) {
+					ret = temp;
+					allGvar.insert(opGVar.begin(), opGVar.end());
+				}
+			}
 		}
 	}
+
 	return ret;
 }
 
-bool ListenerService::funcOpGlobal(std::set<std::string> &funcNameSet, llvm::Function *func) {
+klee::KInstruction::BranchType
+ListenerService::funcOpGlobal(std::set<std::string> &funcNameSet,
+		llvm::Function *func, std::set<std::string> &opGVar) {
 	std::string funcName = func->getName().str();
-	if (funcNameSet.size() > 0 && funcNameSet.find(funcName) == funcNameSet.end())
-		return false;
-	bool ret = false;
+	if (funcNameSet.size() > 0 && funcNameSet.find(funcName) != funcNameSet.end())
+		return klee::KInstruction::none;
+
+	klee::KInstruction::BranchType ret = klee::KInstruction::none;
+
 	funcNameSet.insert(funcName);
 	for (inst_iterator it = inst_begin(func), ie = inst_end(func); it != ie; it++) {
+		if (ret == klee::KInstruction::possible)
+			return klee::KInstruction::possible;
 		Instruction *inst = &*it;
 		if (inst->getOpcode() == Instruction::Load) {
+			// Load ** or more than return possible.
+			LoadInst *li = dyn_cast<LoadInst>(inst);
+
+			if (li->getType()->getTypeID() == Type::PointerTyID) {
+				return klee::KInstruction::possible;
+			}
 			std::string varName = inst->getOperand(0)->getName().str();
 			if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
-				ret = true;
-				break;
+				opGVar.insert(varName);
+				ret = klee::KInstruction::definite;
 			}
 		} else if (inst->getOpcode() == Instruction::Store) {
 			std::string var1 = inst->getOperand(0)->getName().str();
 			std::string var2 = inst->getOperand(1)->getName().str();
+
 			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
-				ret = true;
-				break;
+				opGVar.insert(var1);
+				ret = klee::KInstruction::definite;
 			}
 			if (var2 != "" && globalVarNameSet.find(var2) != globalVarNameSet.end()) {
-				ret = true;
-				break;
+				opGVar.insert(var2);
+				ret = klee::KInstruction::definite;
 			}
 		} else if (inst->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(inst);
 			Function* func = ci->getCalledFunction();
+
 			if (!func->isDeclaration()) {
-				ret = funcOpGlobal(funcNameSet, func);
+				klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
+				if (temp == klee::KInstruction::possible)
+						return klee::KInstruction::possible;
+				if (temp == klee::KInstruction::definite)
+					ret = klee::KInstruction::definite;
 			}
 		}
 	}

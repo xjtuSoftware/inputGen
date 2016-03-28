@@ -24,8 +24,13 @@ private:
 	unsigned runState;
 	struct timeval start, finish;
 
-	bool basicBlockOpGlobal(llvm::BasicBlock *basicBlock);
-	bool funcOpGlobal(std::set<std::string>&, llvm::Function *);
+	klee::KInstruction::BranchType
+		basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::string> &);
+	klee::KInstruction::BranchType
+		funcOpGlobal(std::set<std::string>&, llvm::Function *, std::set<std::string>&);
+
+	bool searchBasicBlock(llvm::BasicBlock *basicBlock);
+	bool searchFuncion(std::set<std::string> &, llvm::Function *function);
 
 
 public:
@@ -52,6 +57,8 @@ public:
 	void endControl(Executor* executor);
 
 	void changeInputAndPrefix(int argc, char **argv, Executor* executor);
+
+	void markBrOpGloabl(Executor *executor);
 
 	std::set<std::string> globalVarNameSet;
 };

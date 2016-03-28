@@ -43,11 +43,16 @@ public:
 
 	unsigned runState;
 
+	std::set<uint64_t> globalVarAddress;
+	std::set<llvm::BasicBlock*> bbOpGlobal;
 
 //	std::map<std::vector<std::string>, Prefix*> symbolicInputPrefix;
 	std::map<Prefix*, std::vector<std::string> > symbolicInputPrefix;
 	std::map<Prefix*, std::map<std::string, unsigned> > intInputPrefix;
 	std::map<std::string, unsigned> intArgv;
+	// if.then or if.else corresponding BasicBlock
+	std::map<std::string, llvm::BasicBlock*> icBB;
+	std::map<llvm::BasicBlock*, std::set<std::string> > bbOpGVarName;
 
 	RuntimeDataManager();
 	virtual ~RuntimeDataManager();

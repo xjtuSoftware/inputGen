@@ -38,8 +38,20 @@ namespace klee {
     /// Destination register index.
     unsigned dest;
 
+    enum BranchType {
+    	none,
+		possible,
+		definite
+    };
+
+    BranchType bt;
+    BranchType trueBT;
+    BranchType falseBT;
+
     bool trueBlockHasGlobal;
     bool falseBlockHasGlobal;
+
+    bool operateGlobalVar;
 
   public:
     virtual ~KInstruction(); 

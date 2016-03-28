@@ -61,6 +61,10 @@ void PSOListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 	//收集全局变量初始化值
 	Module* m = executor->kmodule->module;
 	rdManager->createNewTrace(executor->executionNum);
+	if (rdManager->globalVarAddress.size() != 0)
+		rdManager->globalVarAddress.clear();
+	if (rdManager->bbOpGlobal.size() != 0)
+		rdManager->bbOpGlobal.clear();
 	for (Module::global_iterator i = m->global_begin(), e = m->global_end();
 			i != e; ++i) {
 		if (i->hasInitializer() && i->getName().str().at(0) != '.') {
@@ -505,8 +509,6 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
 							ref<Expr> offset = mo->getOffsetExpr(address);
 							ref<Expr> realExpr = ConstantExpr::create(it->second, sizeof(int) * 8);
-							std::cerr << "real expr in write, second = " << it->second << std::endl;
-							realExpr->dump();
 							wos->write(offset, realExpr);
 					} else {
 						assert(0 && "cannot get the corresponding op in PSOListener(else).\n");
@@ -678,6 +680,14 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 //						ki->inst->getType());
 //				ref<Expr> value = readExpr(state, address, size);
 //				cerr << "load value : " << value << "\n";
+				uint64_t temp = realAddress->getZExtValue();
+				if (rdManager->globalVarAddress.find(temp) !=
+						rdManager->globalVarAddress.end()) {
+					ki->inst->dump();
+					std::cerr << "load basic block name : " <<
+							ki->inst->getParent()->getName().str() << std::endl;
+					rdManager->bbOpGlobal.insert(ki->inst->getParent());
+				}
 				uint64_t key = realAddress->getZExtValue();
 				ObjectPair op;
 				bool success = executor->getMemoryObject(op, state, address);
@@ -749,6 +759,14 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		ref<Expr> address = executor->eval(ki, 1, thread).value;
 		ConstantExpr* realAddress = dyn_cast<ConstantExpr>(address.get());
 		if (realAddress) {
+			uint64_t temp = realAddress->getZExtValue();
+			if (rdManager->globalVarAddress.find(temp) !=
+					rdManager->globalVarAddress.end()) {
+				ki->inst->dump();
+				std::cerr << "store basic block name : " <<
+						ki->inst->getParent()->getName().str() << std::endl;
+				rdManager->bbOpGlobal.insert(ki->inst->getParent());
+			}
 			uint64_t key = realAddress->getZExtValue();
 			ObjectPair op;
 			bool success = executor->getMemoryObject(op, state, address);
@@ -989,6 +1007,7 @@ void PSOListener::handleInitializer(Constant* initializer, MemoryObject* mo,
 		}
 		string globalVariableName = createVarName(mo->id, startAddress,
 				executor->isGlobalMO(mo));
+		rdManager->globalVarAddress.insert(startAddress);
 		trace->insertGlobalVariableInitializer(globalVariableName, initializer);
 //		cerr << "globalVariableName : " << globalVariableName << "    value : "
 //				<< executor->evalConstant(initializer) << "\n";
@@ -1003,6 +1022,7 @@ void PSOListener::handleInitializer(Constant* initializer, MemoryObject* mo,
 		}
 		string globalVariableName = createVarName(mo->id, startAddress,
 				executor->isGlobalMO(mo));
+		rdManager->globalVarAddress.insert(startAddress);
 		trace->insertGlobalVariableInitializer(globalVariableName, initializer);
 //		cerr << "globalVariableName : " << globalVariableName << "    value : "
 //				<< executor->evalConstant(initializer) << "\n";
