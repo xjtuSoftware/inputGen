@@ -16,6 +16,7 @@
 #include "SymbolicListener.h"
 #include "InputGenListener.h"
 #include "Encode.h"
+#include <algorithm>
 
 namespace klee {
 
@@ -266,18 +267,60 @@ void ListenerService::preparation(Executor *executor) {
 						opit->get()->dump();
 						std::set<std::string> allGvar;
 						ki->trueBT = basicBlockOpGlobal(bb, allGvar);
-						if (ki->trueBT == klee::KInstruction::definite)
+						if (ki->trueBT == klee::KInstruction::definite) {
 							rdManager.bbOpGVarName.insert(make_pair(bb, allGvar));
-						rdManager.icBB.insert(make_pair((*opit)->getName().str(), bb));
+							rdManager.ifBB.insert(make_pair((*opit)->getName().str(), bb));
+						}
 					}
 					if (strncmp((*opit)->getName().str().c_str(), "if.else", 7) == 0) {
 						std::set<std::string> allGvar;
 						ki->falseBT = basicBlockOpGlobal(bb, allGvar);
-						if (ki->falseBT == klee::KInstruction::definite)
+						if (ki->falseBT == klee::KInstruction::definite) {
 							rdManager.bbOpGVarName.insert(make_pair(bb, allGvar));
-						rdManager.icBB.insert(make_pair((*opit)->getName().str(), bb));
+							rdManager.ifBB.insert(make_pair((*opit)->getName().str(), bb));
+						}
 					}
 				}
+			}
+		}
+	}
+}
+
+void ListenerService::getMatchingPair(Executor *executor) {
+	std::map<std::string, llvm::BasicBlock*>::iterator it =
+			rdManager.ifBB.begin(), ie = rdManager.ifBB.end();
+
+	for (; it != ie; it++) {
+		std::map<llvm::BasicBlock*, std::set<std::string> >::iterator tempIt =
+				rdManager.bbOpGVarName.find(it->second);
+		assert(tempIt == rdManager.bbOpGVarName.end());
+
+		std::set<std::string> itBB = tempIt->second;
+
+		std::map<std::string, llvm::BasicBlock*>::iterator innerIt = it + 1;
+		for (; innerIt != rdManager.ifBB.end(); innerIt++) {
+			std::map<llvm::BasicBlock*, std::set<std::string> >::iterator
+				innerTemp = rdManager.bbOpGVarName.find(innerIt->second);
+			assert(innerTemp == rdManager.bbOpGVarName.end());
+
+			std::set<std::string> innerItBB = innerTemp->second;
+			unsigned vecSize = itBB.size() > innerItBB.size() ? itBB.size() : innerItBB.size();
+			std::set<std::string>::iterator firstIt = itBB.begin(), firstIe = itBB.end();
+			std::set<std::string>::iterator secondIt = innerItBB.begin(), secondIe = innerItBB.end();
+			std::vector<std::string> intersectRet(vecSize);
+			std::vector<std::string>::iterator vecIt;
+
+			vecIt = std::set_intersection(firstIt, firstIe, secondIt, secondIe, intersectRet.begin());
+
+			intersectRet.resize(vecIt - intersectRet.begin());
+
+			if (intersectRet.size() > 0) {
+				// a matching pair found. store branches of the two br statement.
+				// like pair<if.then, if.then21> pair<if.then, if.else>
+				std::string branchName1(it->first);
+				std::string branchName2(innerIt->first);
+				rdManager.MP.insert(std::make_pair(branchName1, branchName2));
+				rdManager.MP.insert(std::make_pair(branchName2, branchName1));
 			}
 		}
 	}
@@ -373,6 +416,7 @@ ListenerService::funcOpGlobal(std::set<std::string> &funcNameSet,
 	for (inst_iterator it = inst_begin(func), ie = inst_end(func); it != ie; it++) {
 		if (ret == klee::KInstruction::possible)
 			return klee::KInstruction::possible;
+
 		Instruction *inst = &*it;
 		if (inst->getOpcode() == Instruction::Load) {
 			// Load ** or more than return possible.

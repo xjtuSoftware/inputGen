@@ -1247,6 +1247,266 @@ void Encode::buildMemoryModelFormula() {
 	formulaNum++;
 }
 
+void Encode::preprocessWithIfFormula() {
+	unsigned ifSize = ifFormula.size();
+
+	for (unsigned i = 0; i < ifSize; i++) {
+		// get if related with while out
+		Event *curr = ifFormula[i].first;
+		assert(curr->isConditionIns);
+		BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+		std::string brName = bi->getOperand(1)->getName().str();
+		if (strncmp(brName.c_str(), "if.", 3) != 0) {
+			continue;
+		}
+		pureIfFormula.push_back(ifFormula[i]);
+	}
+}
+
+void Encode::processSecondBr(std::string paramName, unsigned s) {
+	unsigned ifSize = pureIfFormula.size();
+	std::set<std::string> nameSet;
+	std::pair<std::multimap<std::string, std::string>::iterator,
+		std::multimap<std::string, std::string>::iterator> pairRet;
+
+	pairRet = runtimeData->MP.equal_range(paramName);
+	if (pairRet.first != pairRet.second) {
+		nameSet.insert(pairRet.first, pairRet.second);
+	}
+
+	for (unsigned i = s + 1; i < ifSize; i++) {
+		Event *curr = pureIfFormula[i].first;
+		std::string currName = "";
+
+		assert(curr->isConditionIns);
+		if (curr->condition) {
+			if (curr->inst->falseBT == klee::KInstruction::possible) {
+				// negate this branch unconditional.
+				negateSpecificBr(pureIfFormula[i]);
+			}
+			if (curr->inst->falseBT == klee::KInstruction::definite) {
+				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+				std::string biName = bi->getOperand(2)->getName().str();
+				if (nameSet.find(biName) != nameSet.end()) {
+					negateSpecificBr(pureIfFormula[i]);
+				}
+			}
+		} else {
+			if (curr->inst->trueBT == klee::KInstruction::possible) {
+				negateSpecificBr(pureIfFormula[i]);
+			}
+			if (curr->inst->trueBT == klee::KInstruction::definite) {
+				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+				std::string biName = bi->getOperand(1)->getName().str();
+				if (nameSet.find(biName) != nameSet.end()) {
+					negateSpecificBr(pureIfFormula[i]);
+				}
+			}
+		}
+	}
+}
+
+void Encode::getPrefixForDefUse() {
+	// get marked information about operating
+	// global variables from event related on if event.
+
+	// get br unrelated if out, like while.body, for.body, and so on.
+	preprocessWithIfFormula();
+
+	unsigned sum = 0, num = 0;
+	unsigned ifSize = pureIfFormula.size();
+	cerr << "Sum of branches: " << ifSize << "\n";
+	//added by LIU Pei
+	std::vector<std::string> vecArgvs;
+	int tt = 1;
+	while (tt < runtimeData->iArgc) {
+			vecArgvs.push_back(std::string(runtimeData->pArgv[tt++]));
+	}
+
+	for (unsigned i = 0; i < ifSize; i++) {
+		//check the other side block of the br instruction;
+		Event *curr = pureIfFormula[i].first;
+		assert(curr->isConditionIns);
+		if (curr->condition) {
+
+			if (curr->inst->trueBT == klee::KInstruction::definite) {
+				// get matching pair and sweep it out the matching pair set.
+				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+				std::string brName = bi->getOperand(1)->getName().str();
+				deleteMPFromThisExe(brName, i);
+				processSecondBr(brName, i);
+			}
+			if (curr->inst->falseBT != klee::KInstruction::none) {
+				// get the other side block of this branch
+				// and negate this branch.
+				if (curr->inst->falseBT == klee::KInstruction::possible) {
+					// negate this branch.
+					negateSpecificBr(pureIfFormula[i]); // has not implements.
+				} else if (curr->inst->falseBT == klee::KInstruction::definite) {
+					// find it could be a matching pair exist.
+					// firstly, negate the this branch.
+					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+					std::string brName = bi->getOperand(2)->getName().str();
+					if (processFirstBr(brName, i)) {
+						negateSpecificBr(pureIfFormula[i]);
+					}
+				}
+			}
+		} else {
+			// 本次为false。
+			if (curr->inst->falseBT == klee::KInstruction::definite) {
+				// get matching pair and sweep it out the matching pair set.
+			}
+			if (curr->inst->trueBT != klee::KInstruction::none) {
+				// negate this branch, get the other side.
+			}
+		}
+	}
+}
+
+bool Encode::processFirstBr(std::string param, unsigned s) {
+	bool ret = false;
+	unsigned ifSize = pureIfFormula.size();
+	std::set<std::string> nameSet;
+	std::pair<std::multimap<std::string, std::string>::iterator,
+		std::multimap<std::string, std::string>::iterator> pairRet;
+
+	pairRet = runtimeData->MP.equal_range(param);
+	if (pairRet.first != pairRet.second) {
+		nameSet.insert(pairRet.first, pairRet.second);
+	} else {
+		return false; // It's impossible is there a mp in the MP set.
+	}
+
+	for (unsigned i = s + 1; i < ifSize; i++) {
+		Event *curr = pureIfFormula[i].first;
+		BranchInst *currInst = dyn_cast<BranchInst>(curr->inst->inst);
+		std::string currName = "";
+
+		assert(curr->isConditionIns);
+		if (curr->condition) {
+			if (curr->inst->trueBT == klee::KInstruction::definite) {
+				currName = currInst->getOperand(1)->getName().str();
+				if (nameSet.find(currName) != nameSet.end()) {
+					ret = true;
+					break;
+				}
+			}
+		} else {
+			if (curr->inst->falseBT == klee::KInstruction::definite) {
+				currName = currInst->getOperand(2)->getName().str();
+				if (nameSet.find(currName) != nameSet.end()) {
+					ret = true;
+					break;
+				}
+			}
+		}
+	}
+	return ret;
+}
+
+void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {
+	unsigned ifSize = pureIfFormula.size();
+
+	std::set<std::string> nameSet;
+	std::pair<std::multimap<std::string, std::string>::iterator,
+		std::multimap<std::string, std::string>::iterator> ret;
+
+	ret = runtimeData->MP.equal_range(brParamName);
+	if (ret.first != ret.second) {
+		nameSet.insert(ret.first, ret.second);
+	} else {
+		return ;
+	}
+
+	for (unsigned i = s + 1; i < ifSize; i++) {
+		Event *curr = pureIfFormula[i].first;
+		BranchInst *currInst = dyn_cast<BranchInst>(curr->inst->inst);
+		std::string currName = "";
+
+		assert(curr->isConditionIns);
+		if (curr->condition) {
+			if (curr->inst->trueBT == klee::KInstruction::definite) {
+				currName = currInst->getOperand(1)->getName().str();
+				if (nameSet.find(currName) != nameSet.end()) {
+					// there is a matching pair. delete from the mp set.
+					for (multimap<std::string, std::string>::iterator it = runtimeData->MP.begin(),
+							ie = runtimeData->MP.end(); it != ie; it++) {
+						if (it->first == brParamName && it->second == currName) {
+							runtimeData->MP.erase(it);
+							break;
+						}
+					}
+				}
+			}
+		} else {
+			if (curr->inst->falseBT == klee::KInstruction::definite) {
+				currName = currInst->getOperand(2)->getName().str();
+				if (nameSet.find(currName) != nameSet.end()) {
+					for (std::multimap<std::string, std::string>::iterator it =
+							runtimeData->MP.begin(), ie = runtimeData->MP.end(); it != ie; it++) {
+						if (it->first == brParamName && it->second == currName) {
+							runtimeData->MP.erase(it);
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void Encode::handlePossibleGVar() {
+}
+
+
+void Encode::negateSpecificBr(std::pair<Event*, expr>& specificPair) {
+	// negate this branch get the corresponding prefix.
+}
+
+
+void Encode::handleDefiniteBT(Event *param, unsigned op, unsigned s) {
+	unsigned ifSize = pureIfFormula.size();
+	BranchInst *paramInst = dyn_cast<BranchInst>(param->inst);
+	std::string brParamName = paramInst->getOperand(op)->getName().str();
+	std::set<std::string> nameSet;
+	std::pair<std::multimap<std::string, std::string>::iterator,
+		std::multimap<std::string, std::string>::iterator> ret;
+
+	ret = runtimeData->MP.equal_range(brParamName);
+	if (ret.first != ret.second) {
+		nameSet.insert(ret.first, ret.second);
+	}
+
+	for (unsigned i = s + 1; i < ifSize; i++) {
+		Event *curr = pureIfFormula[i].first;
+
+		BranchInst *currInst = dyn_cast<BranchInst>(curr);
+		std::string currName = "";
+		if (curr->isConditionIns && curr->condition) {
+			// 本次为true，首先判断是否可以构成matching pair
+			// 如果可以构成，将其删除，否则，判断其是否可以取反构成MP
+			currName = currInst->getOperand(1)->getName().str();
+			if (curr->inst->trueBT == klee::KInstruction::definite) {
+				if (nameSet.find(currName) != nameSet.end()) {
+					// there is a matching pair. delete from the mp set.
+					for (multimap<std::string, std::string>::iterator it = runtimeData->MP.begin(),
+							ie = runtimeData->MP.end(); it != ie; it++) {
+						if ((*it).first == brParamName && (*it).second == currName) {
+							runtimeData->MP.erase(it);
+							break;
+						}
+					}
+				}
+			}
+		} else if (curr->isConditionIns && !curr->condition) {
+			currName = currInst->getOperand(2)->getName().str();
+		}
+
+
+	}
+}
+
 //level: 0--bitcode; 1--source code; 2--block
 void Encode::controlGranularity(int level) {
 //	map<string, InstType> record;
@@ -1856,5 +2116,6 @@ expr Encode::makeExprsSum(vector<expr> exprs) {
 	ret.simplify();
 	return ret;
 }
+
 }
 

@@ -55,6 +55,15 @@ public:
 	void check_if();
 	bool verify();
 
+	void getPrefixForDefUse();
+	void deleteMPFromThisExe(std::string, unsigned);
+	bool processFirstBr(std::string, unsigned);
+	void processSecondBr(std::string, unsigned);
+	void negateSpecificBr(std::pair<Event*, expr>&);
+	void handlePossibleGVar();
+	void handleDefiniteBT(Event *, unsigned, unsigned);
+	void preprocessWithIfFormula();
+
 private:
 
 	////////////////////////////////modify this sagment at the end/////////////////////////
@@ -64,6 +73,8 @@ private:
 	vector<pair<Event*, expr> > ifFormula;
 	vector<pair<Event*, expr> > assertFormula;
 	vector<pair<Event*, expr> > rwFormula;
+
+	vector<pair<Event*, expr> > pureIfFormula;
 
 	void buildInitValueFormula(solver z3_solver_init);
 	void buildPathCondition(solver z3_solver_pc);
@@ -103,6 +114,7 @@ private:
 	void logStatisticInfo();
 
 	void controlGranularity(int level);
+
 
 };
 

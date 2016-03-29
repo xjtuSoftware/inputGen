@@ -43,6 +43,7 @@ public:
 	RuntimeDataManager* getRuntimeDataManager();
 
 	void preparation(Executor* executor);
+	void getMatchingPair(Executor *executor);
 	void beforeRunMethodAsMain(ExecutionState &initialState);
 	void executeInstruction(ExecutionState &state, KInstruction *ki);
 	void instructionExecuted(ExecutionState &state, KInstruction *ki);

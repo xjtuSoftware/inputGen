@@ -51,8 +51,10 @@ public:
 	std::map<Prefix*, std::map<std::string, unsigned> > intInputPrefix;
 	std::map<std::string, unsigned> intArgv;
 	// if.then or if.else corresponding BasicBlock
-	std::map<std::string, llvm::BasicBlock*> icBB;
+	std::map<std::string, llvm::BasicBlock*> ifBB;
 	std::map<llvm::BasicBlock*, std::set<std::string> > bbOpGVarName;
+	std::multimap<std::string, std::string> MP;
+	std::set<std::string> possibleBranch;
 
 	RuntimeDataManager();
 	virtual ~RuntimeDataManager();

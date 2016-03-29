@@ -657,5 +657,3 @@ void SymbolicListener::storeZeroToExpr(ExecutionState& state, ref<Expr> address,
 }
 
 }
-
-
