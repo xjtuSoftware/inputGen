@@ -48,6 +48,12 @@ public:
 			std::map<std::string, char>& charInfo, Event* event);
 	void getPrefixFromPath(std::vector<Event*>&, Event*);
 
+	void negateBranchForDefUse(Executor::BinTree *);
+	void deleteMPFromCurrExe(std::string, Executor::BinTree*);
+	bool processFirstBr(std::string, Executor::BinTree *);
+	void processSecondBr(std::string, Executor::BinTree *);
+	void negateThisBranch(Executor::BinTree *);
+
 private:
 	Executor *executor;
 	RuntimeDataManager * rdManager;

@@ -289,16 +289,22 @@ void ListenerService::preparation(Executor *executor) {
 void ListenerService::getMatchingPair(Executor *executor) {
 	std::map<std::string, llvm::BasicBlock*>::iterator it =
 			rdManager.ifBB.begin(), ie = rdManager.ifBB.end();
+	unsigned cnt = 0;
 
-	for (; it != ie; it++) {
+
+	for (; it != ie; it++, cnt++) {
 		std::map<llvm::BasicBlock*, std::set<std::string> >::iterator tempIt =
 				rdManager.bbOpGVarName.find(it->second);
+		unsigned delta = 0;
 		assert(tempIt == rdManager.bbOpGVarName.end());
 
 		std::set<std::string> itBB = tempIt->second;
+		std::map<std::string, llvm::BasicBlock*>::iterator innerIt =
+				rdManager.ifBB.begin(), innerIe = rdManager.ifBB.end();
+		while (delta <= cnt)
+			innerIt++;
 
-		std::map<std::string, llvm::BasicBlock*>::iterator innerIt = it + 1;
-		for (; innerIt != rdManager.ifBB.end(); innerIt++) {
+		for (; innerIt != innerIe; innerIt++) {
 			std::map<llvm::BasicBlock*, std::set<std::string> >::iterator
 				innerTemp = rdManager.bbOpGVarName.find(innerIt->second);
 			assert(innerTemp == rdManager.bbOpGVarName.end());
