@@ -402,7 +402,7 @@ void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinT
 		assert(curr->isConditionIns);
 		if (node->brTrue) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = currInst->getOperand(2)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					for (std::multimap<std::string, std::string>::iterator it =
 							rdManager->MP.begin(), ie = rdManager->MP.end(); it != ie; it++) {
@@ -414,7 +414,7 @@ void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinT
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = currInst->getOperand(1)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					for (std::multimap<std::string, std::string>::iterator it =
 							rdManager->MP.begin(), ie = rdManager->MP.end(); it != ie; it++) {
@@ -428,7 +428,7 @@ void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinT
 	}
 }
 
-bool InputGenListener::processFirstBr(std::string paramName, Executor::BinTree *node) {
+bool InputGenListener::tryNegateFirstBr(std::string paramName, Executor::BinTree *node) {
 	bool ret = false;
 	std::set<std::string> nameSet;
 	std::pair<std::multimap<std::string, std::string>::iterator,
@@ -452,7 +452,7 @@ bool InputGenListener::processFirstBr(std::string paramName, Executor::BinTree *
 		assert(curr->isConditionIns);
 		if (node->brTrue) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = currInst->getOperand(2)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					ret = true;
 					break;
@@ -460,7 +460,7 @@ bool InputGenListener::processFirstBr(std::string paramName, Executor::BinTree *
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = currInst->getOperand(1)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					ret = true;
 					break;
@@ -471,7 +471,7 @@ bool InputGenListener::processFirstBr(std::string paramName, Executor::BinTree *
 	return ret;
 }
 
-void InputGenListener::processSecondBr(std::string paramName, Executor::BinTree *node) {
+void InputGenListener::tryNegateSecondBr(std::string paramName, Executor::BinTree *node) {
 	std::set<std::string> nameSet;
 	std::pair<std::multimap<std::string, std::string>::iterator,
 		std::multimap<std::string, std::string>::iterator> ret;
@@ -493,7 +493,7 @@ void InputGenListener::processSecondBr(std::string paramName, Executor::BinTree 
 			}
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(2)->getName().str();
+				std::string biName = bi->getOperand(1)->getName().str();
 
 				if (nameSet.find(biName) != nameSet.end()) {
 					negateThisBranch(node);
@@ -505,7 +505,7 @@ void InputGenListener::processSecondBr(std::string paramName, Executor::BinTree 
 			}
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(1)->getName().str();
+				std::string biName = bi->getOperand(2)->getName().str();
 
 				if (nameSet.find(biName) != nameSet.end()) {
 					negateThisBranch(node);
@@ -530,7 +530,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 					std::string brName = bi->getOperand(1)->getName().str();
 					deleteMPFromCurrExe(brName, temp->next);
-					processSecondBr(brName, temp->next);
+					tryNegateSecondBr(brName, temp->next);
 				}
 				if (curr->inst->falseBT != klee::KInstruction::none) {
 					if (curr->inst->falseBT == klee::KInstruction::possible) {
@@ -540,7 +540,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 						BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 						std::string brName = bi->getOperand(2)->getName().str();
 
-						if (processFirstBr(brName, temp->next)) {
+						if (tryNegateFirstBr(brName, temp->next)) {
 							negateThisBranch(temp);
 						}
 					}
@@ -550,7 +550,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 					std::string brName = bi->getOperand(2)->getName().str();
 					deleteMPFromCurrExe(brName, temp->next);
-					processSecondBr(brName, temp->next);
+					tryNegateSecondBr(brName, temp->next);
 				}
 				if (curr->inst->trueBT != klee::KInstruction::none) {
 					if (curr->inst->falseBT == klee::KInstruction::possible) {
@@ -560,7 +560,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 						BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 						std::string brName = bi->getOperand(1)->getName().str();
 
-						if (processFirstBr(brName, temp->next)) {
+						if (tryNegateFirstBr(brName, temp->next)) {
 							negateThisBranch(temp);
 						}
 					}

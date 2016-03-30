@@ -28,6 +28,8 @@ private:
 		basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::string> &);
 	klee::KInstruction::BranchType
 		funcOpGlobal(std::set<std::string>&, llvm::Function *, std::set<std::string>&);
+	klee::KInstruction::BranchType instOpGlobal(llvm::Instruction *, std::set<std::string> &);
+	std::string getBlockFullName(llvm::BranchInst *, bool brCond);
 
 	bool searchBasicBlock(llvm::BasicBlock *basicBlock);
 	bool searchFuncion(std::set<std::string> &, llvm::Function *function);

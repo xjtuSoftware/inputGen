@@ -57,8 +57,8 @@ public:
 
 	void getPrefixForDefUse();
 	void deleteMPFromThisExe(std::string, unsigned);
-	bool processFirstBr(std::string, unsigned);
-	void processSecondBr(std::string, unsigned);
+	bool tryNegateFirstBr(std::string, unsigned);
+	void tryNegateSecondBr(std::string, unsigned);
 	void negateSpecificBr(std::pair<Event*, expr>&);
 	void handlePossibleGVar();
 	void handleDefiniteBT(Event *, unsigned, unsigned);

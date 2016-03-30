@@ -1263,7 +1263,7 @@ void Encode::preprocessWithIfFormula() {
 	}
 }
 
-void Encode::processSecondBr(std::string paramName, unsigned s) {
+void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 	unsigned ifSize = pureIfFormula.size();
 	std::set<std::string> nameSet;
 	std::pair<std::multimap<std::string, std::string>::iterator,
@@ -1287,7 +1287,7 @@ void Encode::processSecondBr(std::string paramName, unsigned s) {
 			}
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(2)->getName().str();
+				std::string biName = bi->getOperand(1)->getName().str();
 				if (nameSet.find(biName) != nameSet.end()) {
 					negateSpecificBr(pureIfFormula[i]);
 				}
@@ -1298,7 +1298,7 @@ void Encode::processSecondBr(std::string paramName, unsigned s) {
 			}
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(1)->getName().str();
+				std::string biName = bi->getOperand(2)->getName().str();
 				if (nameSet.find(biName) != nameSet.end()) {
 					negateSpecificBr(pureIfFormula[i]);
 				}
@@ -1325,9 +1325,9 @@ void Encode::getPrefixForDefUse() {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
 				// get matching pair and sweep it out the matching pair set.
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string brName = bi->getOperand(1)->getName().str();
+				std::string brName = bi->getOperand(2)->getName().str();
 				deleteMPFromThisExe(brName, i);
-				processSecondBr(brName, i);
+				tryNegateSecondBr(brName, i);
 			}
 			if (curr->inst->falseBT != klee::KInstruction::none) {
 				// get the other side block of this branch
@@ -1339,8 +1339,8 @@ void Encode::getPrefixForDefUse() {
 					// find it could be a matching pair exist.
 					// firstly, negate the this branch.
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-					std::string brName = bi->getOperand(2)->getName().str();
-					if (processFirstBr(brName, i)) {
+					std::string brName = bi->getOperand(1)->getName().str();
+					if (tryNegateFirstBr(brName, i)) {
 						negateSpecificBr(pureIfFormula[i]);
 					}
 				}
@@ -1349,9 +1349,9 @@ void Encode::getPrefixForDefUse() {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
 				// get matching pair and sweep it out the matching pair set.
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string brName = bi->getOperand(2)->getName().str();
+				std::string brName = bi->getOperand(1)->getName().str();
 				deleteMPFromThisExe(brName, i);
-				processSecondBr(brName, i);
+				tryNegateSecondBr(brName, i);
 			}
 			if (curr->inst->trueBT != klee::KInstruction::none) {
 				// negate this branch, get the other side.
@@ -1359,8 +1359,8 @@ void Encode::getPrefixForDefUse() {
 					negateSpecificBr(pureIfFormula[i]);
 				} else if (curr->inst->trueBT == klee::KInstruction::definite) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-					std::string brName = bi->getOperand(1)->getName().str();
-					if (processFirstBr(brName, i)) {
+					std::string brName = bi->getOperand(2)->getName().str();
+					if (tryNegateFirstBr(brName, i)) {
 						negateSpecificBr(pureIfFormula[i]);
 					}
 				}
@@ -1369,7 +1369,7 @@ void Encode::getPrefixForDefUse() {
 	}
 }
 
-bool Encode::processFirstBr(std::string param, unsigned s) {
+bool Encode::tryNegateFirstBr(std::string param, unsigned s) {
 	bool ret = false;
 	unsigned ifSize = pureIfFormula.size();
 	std::set<std::string> nameSet;
@@ -1394,7 +1394,7 @@ bool Encode::processFirstBr(std::string param, unsigned s) {
 		assert(curr->isConditionIns);
 		if (curr->condition) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = currInst->getOperand(2)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					ret = true;
 					break;
@@ -1402,7 +1402,7 @@ bool Encode::processFirstBr(std::string param, unsigned s) {
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = currInst->getOperand(1)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					ret = true;
 					break;
@@ -1438,7 +1438,7 @@ void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {
 		assert(curr->isConditionIns);
 		if (curr->condition) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = currInst->getOperand(2)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					// there is a matching pair. delete from the mp set.
 					for (std::multimap<std::string, std::string>::iterator it = runtimeData->MP.begin(),
@@ -1451,7 +1451,7 @@ void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = currInst->getOperand(1)->getName().str();
 				if (nameSet.find(currName) != nameSet.end()) {
 					for (std::multimap<std::string, std::string>::iterator it =
 							runtimeData->MP.begin(), ie = runtimeData->MP.end(); it != ie; it++) {

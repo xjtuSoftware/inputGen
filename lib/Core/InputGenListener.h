@@ -50,9 +50,10 @@ public:
 
 	void negateBranchForDefUse(Executor::BinTree *);
 	void deleteMPFromCurrExe(std::string, Executor::BinTree*);
-	bool processFirstBr(std::string, Executor::BinTree *);
-	void processSecondBr(std::string, Executor::BinTree *);
+	bool tryNegateFirstBr(std::string, Executor::BinTree *);
+	void tryNegateSecondBr(std::string, Executor::BinTree *);
 	void negateThisBranch(Executor::BinTree *);
+	std::string getBlockFullName(Instruction *inst, bool boolCond);
 
 private:
 	Executor *executor;

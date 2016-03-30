@@ -235,6 +235,52 @@ void ListenerService::markBrOpGloabl(Executor *executor) {
 	}
 }
 
+std::string ListenerService::getBlockFullName(llvm::BranchInst *bi, bool brCond) {
+	std::string ret = "";
+
+	std::string blockName = "";
+	if (brCond)
+		blockName = bi->getOperand(2)->getName().str();
+	else
+		blockName = bi->getOperand(1)->getName().str();
+
+	std::string funcName = bi->getParent()->getParent()->getName().str();
+
+	ret = funcName + "." + blockName;
+
+	return ret;
+}
+
+KInstruction::BranchType ListenerService::instOpGlobal(
+		Instruction *inst, std::set<std::string> &gVarNames) {
+	KInstruction::BranchType ret = KInstruction::none;
+	if (inst->getOpcode() == Instruction::Load) {
+		LoadInst *li = dyn_cast<LoadInst>(inst);
+		if (li->getType()->getTypeID() == Type::PointerTyID)
+			return KInstruction::possible;
+		std::string varName = inst->getOperand(0)->getName().str();
+
+		if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
+			gVarNames.insert(varName);
+			ret = KInstruction::definite;
+		}
+	} else if (inst->getOpcode() == Instruction::Store) {
+		StoreInst *si = dyn_cast<StoreInst>(inst);
+		std::string var1 = inst->getOperand(0)->getName().str();
+		std::string var2 = inst->getOperand(1)->getName().str();
+
+		if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
+			gVarNames.insert(var1);
+			ret = KInstruction::definite;
+		}
+		if (var2 != "" && globalVarNameSet.find(var2) != globalVarNameSet.end()) {
+			gVarNames.insert(var2);
+			ret = KInstruction::definite;
+		}
+	}
+
+	return ret;
+}
 
 void ListenerService::preparation(Executor *executor) {
 	//get global variable name;
@@ -251,44 +297,100 @@ void ListenerService::preparation(Executor *executor) {
 	for (std::vector<KFunction*>::iterator it = executor->kmodule->functions.begin(),
 			ie = executor->kmodule->functions.end(); it != ie; it++) {
 		KInstruction **instructions = (*it)->instructions;
+		(*it)->function->dump();
 		for (unsigned i = 0; i < (*it)->numInstructions; i++) {
 			KInstruction *ki = instructions[i];
 			Instruction *inst = ki->inst;
+			inst->dump();
 
 			if (inst->getOpcode() == Instruction::Br) {
 				BranchInst *bi = cast<BranchInst>(inst);
 				if (bi->isUnconditional())
 					continue;
-				BranchInst::op_iterator opit = bi->op_begin(), opie = bi->op_end();
-				opit++;
-				for (; opit != opie; opit++) {
-					BasicBlock *bb = (BasicBlock*)(opit->get());
-					if (strncmp((*opit)->getName().str().c_str(), "if.then", 7) == 0) {
-						opit->get()->dump();
-						std::set<std::string> allGvar;
-						ki->trueBT = basicBlockOpGlobal(bb, allGvar);
-						if (ki->trueBT == klee::KInstruction::definite) {
-							rdManager.bbOpGVarName.insert(make_pair(bb, allGvar));
-							rdManager.ifBB.insert(make_pair((*opit)->getName().str(), bb));
-						}
+				if (strncmp(bi->getOperand(1)->getName().str().c_str(), "if.else", 7) == 0 &&
+						strncmp(bi->getOperand(2)->getName().str().c_str(), "if.then", 7) == 0 &&
+						strncmp(bi->getParent()->getParent()->getName().str().c_str(), "klee", 4) != 0) {
+				std::cerr << "ki->info->line = " << ki->info->line << endl;
+					bi->dump();
+				bool isPossible = false;
+				std::set<std::string> gVarNames;
+				llvm::Instruction *optiInst = (llvm::Instruction *)bi->getOperand(0);
+				optiInst->dump();
+				optiInst = optiInst->getNextNode();
+				std::cerr << "optiInst : " << endl;
+				optiInst->dump();
+				while (optiInst->getOpcode() != Instruction::Br) {
+					KInstruction::BranchType temp = instOpGlobal(optiInst, gVarNames);
+					if (temp == KInstruction::possible) {
+						isPossible = true;
+						break;
 					}
-					if (strncmp((*opit)->getName().str().c_str(), "if.else", 7) == 0) {
-						std::set<std::string> allGvar;
-						ki->falseBT = basicBlockOpGlobal(bb, allGvar);
-						if (ki->falseBT == klee::KInstruction::definite) {
-							rdManager.bbOpGVarName.insert(make_pair(bb, allGvar));
-							rdManager.ifBB.insert(make_pair((*opit)->getName().str(), bb));
-						}
+					optiInst = optiInst->getNextNode();
+				}
+				std::cerr << "must br : " << endl;
+				optiInst->dump();
+				if (isPossible) {
+					std::cerr << "that's possible branch." << endl;
+					ki->trueBT = KInstruction::possible;
+					ki->falseBT = KInstruction::possible;
+				} else {
+					// handle true block.
+					bi->dump();
+					std::set<std::string> thenNames;
+					thenNames.insert(gVarNames.begin(), gVarNames.end());
+					std::string thenName = bi->getOperand(2)->getName().str();
+					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+					std::cerr << "then block name : " << thenName << endl;
+					BasicBlock *bbThen = bi->getSuccessor(0);
+					ki->trueBT = basicBlockOpGlobal(bbThen, thenNames);
+					std::set<std::string>::iterator thenIt = thenNames.begin(),
+							thenIe = thenNames.end();
+					for (; thenIt != thenIe; thenIt++) {
+						std::cerr << "then global var: " << *thenIt << endl;
+					}
+					std::string fullThen = getBlockFullName(bi, true);
+					std::cerr << "true full name : " << fullThen << endl;
+					std::cerr << "ki->trueBT : " << ki->trueBT << endl;
+					std::cerr << "=========================" << endl;
+					if (ki->trueBT == KInstruction::definite) {
+						rdManager.bbOpGVarName.insert(make_pair(bbThen, thenNames));
+						rdManager.ifBB.insert(make_pair(fullThen, bbThen));
+					}
+
+					// handle else block
+					std::set<std::string> elseNames;
+					elseNames.insert(gVarNames.begin(), gVarNames.end());
+					std::string elseName = bi->getOperand(1)->getName().str();
+					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+					std::cerr << "else block name : " << elseName << endl;
+					BasicBlock *bbElse = bi->getSuccessor(1);
+					ki->falseBT = basicBlockOpGlobal(bbElse, elseNames);
+					std::string fullElse = getBlockFullName(bi, false);
+					std::set<std::string>::iterator elseIt = elseNames.begin(),
+							elseIe = elseNames.end();
+					for (; elseIt != elseIe; elseIt++) {
+						std::cerr << "else global var: " << *elseIt << endl;
+					}
+					std::cerr << "false full name : " << fullElse << endl;
+					std::cerr << "ki->falseBT : " << ki->falseBT << endl;
+					std::cerr << "=========================" << endl;
+					if (ki->falseBT == KInstruction::definite) {
+						rdManager.bbOpGVarName.insert(make_pair(bbElse, elseNames));
+						rdManager.ifBB.insert(make_pair(fullElse, bbElse));
 					}
 				}
 			}
 		}
+		}
 	}
+	getMatchingPair(executor);
 }
 
 void ListenerService::getMatchingPair(Executor *executor) {
 	std::map<std::string, llvm::BasicBlock*>::iterator it =
 			rdManager.ifBB.begin(), ie = rdManager.ifBB.end();
+	std::cerr << "ifBB size = " << rdManager.ifBB.size() << ", " <<
+			", bbOpGVarName : " << rdManager.bbOpGVarName.size() << endl;
 	unsigned cnt = 0;
 
 
@@ -296,18 +398,31 @@ void ListenerService::getMatchingPair(Executor *executor) {
 		std::map<llvm::BasicBlock*, std::set<std::string> >::iterator tempIt =
 				rdManager.bbOpGVarName.find(it->second);
 		unsigned delta = 0;
-		assert(tempIt == rdManager.bbOpGVarName.end());
+		unsigned pos = 0;
+		if (tempIt == rdManager.bbOpGVarName.end()) {
+			std::cerr << "do not have corresponding string set." << endl;
+			assert(0 && "do not have corresponding string set.\n");
+		}
 
 		std::set<std::string> itBB = tempIt->second;
 		std::map<std::string, llvm::BasicBlock*>::iterator innerIt =
 				rdManager.ifBB.begin(), innerIe = rdManager.ifBB.end();
-		while (delta <= cnt)
+		while (delta <= cnt) {
 			innerIt++;
-
+			delta++;
+		}
+		while (it->first[pos] != '.') {
+			pos++;
+		}
 		for (; innerIt != innerIe; innerIt++) {
 			std::map<llvm::BasicBlock*, std::set<std::string> >::iterator
 				innerTemp = rdManager.bbOpGVarName.find(innerIt->second);
-			assert(innerTemp == rdManager.bbOpGVarName.end());
+			if (innerTemp == rdManager.bbOpGVarName.end()) {
+				std::cerr << "do not have corresponding string set innner." << endl;
+				assert(0 && "do not have corresponding string set innner.\n");
+			}
+			if (strncmp(it->first.c_str(), innerIt->first.c_str(), pos) == 0)
+				continue;
 
 			std::set<std::string> innerItBB = innerTemp->second;
 			unsigned vecSize = itBB.size() > innerItBB.size() ? itBB.size() : innerItBB.size();
@@ -327,6 +442,10 @@ void ListenerService::getMatchingPair(Executor *executor) {
 				std::string branchName2(innerIt->first);
 				rdManager.MP.insert(std::make_pair(branchName1, branchName2));
 				rdManager.MP.insert(std::make_pair(branchName2, branchName1));
+
+				std::cerr << "MP first : " << branchName1 <<
+						", second : " << branchName2 << endl;
+				std::cerr << "MP size = " << rdManager.MP.size() << endl;
 			}
 		}
 	}
@@ -339,9 +458,11 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 
 	for (BasicBlock::iterator bit = basicBlock->begin(), bie = basicBlock->end();
 			bit != bie; bit++) {
+//		bit->dump();
 		if (bit->getOpcode() == Instruction::Load) {
 			LoadInst *li = dyn_cast<LoadInst>(bit);
 			std::string varName = bit->getOperand(0)->getName().str();
+			std::cerr << "Load name : " << varName << endl;
 
 			if (li->getType()->getTypeID() == Type::PointerTyID) {
 				return klee::KInstruction::possible;
@@ -367,16 +488,15 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 				 BranchInst *bi = cast<BranchInst>(bit);
 			if (bi->isUnconditional())
 				continue;
-			BranchInst::op_iterator opit = bi->op_begin();
-			opit++;
 			klee::KInstruction::BranchType ret1 =
-					basicBlockOpGlobal((BasicBlock*)(opit->get()), allGvar);
-			opit++;
+					basicBlockOpGlobal(bi->getSuccessor(0), allGvar);
 			klee::KInstruction::BranchType ret2 =
-					basicBlockOpGlobal((BasicBlock*)(opit->get()), allGvar);
+					basicBlockOpGlobal(bi->getSuccessor(1), allGvar);
+
 			if (ret1 == klee::KInstruction::possible ||
 					ret2 == klee::KInstruction::possible)
 				return klee::KInstruction::possible;
+
 			if (ret1 == klee::KInstruction::definite ||
 					ret2 == klee::KInstruction::definite)
 				ret = klee::KInstruction::definite;
