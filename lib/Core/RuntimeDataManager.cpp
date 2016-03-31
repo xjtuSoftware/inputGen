@@ -113,7 +113,6 @@ void RuntimeDataManager::printCurrentTrace(bool file) {
 }
 
 Prefix* RuntimeDataManager::getNextPrefix() {
-	//cerr << "prefix num = " << scheduleSet.size() << endl;
 	if (scheduleSet.empty()) {
 		return NULL;
 	} else {
@@ -176,4 +175,10 @@ void RuntimeDataManager::printAllTrace(ostream &out) {
 	}
 }
 
+int RuntimeDataManager::getPrefixSetSize() {
+	return scheduleSet.size();
 }
+
+}
+
+

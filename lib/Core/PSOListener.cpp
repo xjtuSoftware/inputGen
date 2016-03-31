@@ -683,9 +683,6 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				uint64_t temp = realAddress->getZExtValue();
 				if (rdManager->globalVarAddress.find(temp) !=
 						rdManager->globalVarAddress.end()) {
-					ki->inst->dump();
-					std::cerr << "load basic block name : " <<
-							ki->inst->getParent()->getName().str() << std::endl;
 					rdManager->bbOpGlobal.insert(ki->inst->getParent());
 				}
 				uint64_t key = realAddress->getZExtValue();
@@ -762,9 +759,6 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			uint64_t temp = realAddress->getZExtValue();
 			if (rdManager->globalVarAddress.find(temp) !=
 					rdManager->globalVarAddress.end()) {
-				ki->inst->dump();
-				std::cerr << "store basic block name : " <<
-						ki->inst->getParent()->getName().str() << std::endl;
 				rdManager->bbOpGlobal.insert(ki->inst->getParent());
 			}
 			uint64_t key = realAddress->getZExtValue();
@@ -956,6 +950,7 @@ void PSOListener::afterRunMethodAsMain() {
 			while (prefix) {
 				delete prefix;
 				prefix = NULL;
+				prefix = rdManager->getNextPrefix();
 			}
 		}
 		rdManager->runState = 0;

@@ -68,6 +68,7 @@ public:
 	bool isCurrentTraceUntested();
 	void printAllPrefix(std::ostream &out);
 	void printAllTrace(std::ostream &out);
+	int getPrefixSetSize();
 };
 
 }

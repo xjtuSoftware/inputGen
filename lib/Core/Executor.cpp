@@ -4654,6 +4654,7 @@ void Executor::runVerification(llvm::Function *f, int argc, char **argv,
 	while (!isFinished && execStatus != RUNTIMEERROR) {
 		execStatus = SUCCESS;
 		listenerService->startControl(this);
+		std::cerr << "start control execute." << endl;
 		listenerService->changeInputAndPrefix(argc, argv, this);
 //		for (int i = 0; i < argc; i++) {
 //			std::cerr << "argv " << i << ":" << argv[i] << std::endl;

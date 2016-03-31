@@ -144,12 +144,15 @@ void ListenerService::endControl(Executor* executor){
 		popListener();
 		rdManager.runState = 2;
 		//comment out to execute the input generate listener.
-		markBrOpGloabl(executor);
+//		markBrOpGloabl(executor);
 		Encode encode(&rdManager);
 		encode.buildifAndassert();
+//		encode.getPrefixForDefUse();
+//		/***
 		if (encode.verify()) {
 			encode.check_if();
 		}
+//		*****/
 //		executor->getNewPrefix();
 		gettimeofday(&finish, NULL);
 		double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec
@@ -175,9 +178,11 @@ void ListenerService::endControl(Executor* executor){
 }
 
 void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* executor) {
+	std::cerr << "prefix set size = " << rdManager.getPrefixSetSize() << endl;
 	if (rdManager.runState == 0 && rdManager.symbolicInputPrefix.size() != 0) {
 		std::map<Prefix*, std::vector<std::string> >::iterator it =
 				rdManager.symbolicInputPrefix.begin();
+		std::cerr << "size of prefix and input : " << rdManager.symbolicInputPrefix.size() << endl;
 		executor->prefix = it->first;
 		int i = 1;
 		std::vector<std::string>::size_type cnt = it->second.size();
@@ -206,6 +211,7 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 	}
 	rdManager.pArgv = argv;
 	rdManager.iArgc = argc;
+	std::cerr << "argc = " << argc << endl;
 }
 
 void ListenerService::markBrOpGloabl(Executor *executor) {
@@ -297,11 +303,9 @@ void ListenerService::preparation(Executor *executor) {
 	for (std::vector<KFunction*>::iterator it = executor->kmodule->functions.begin(),
 			ie = executor->kmodule->functions.end(); it != ie; it++) {
 		KInstruction **instructions = (*it)->instructions;
-		(*it)->function->dump();
 		for (unsigned i = 0; i < (*it)->numInstructions; i++) {
 			KInstruction *ki = instructions[i];
 			Instruction *inst = ki->inst;
-			inst->dump();
 
 			if (inst->getOpcode() == Instruction::Br) {
 				BranchInst *bi = cast<BranchInst>(inst);
@@ -310,15 +314,10 @@ void ListenerService::preparation(Executor *executor) {
 				if (strncmp(bi->getOperand(1)->getName().str().c_str(), "if.else", 7) == 0 &&
 						strncmp(bi->getOperand(2)->getName().str().c_str(), "if.then", 7) == 0 &&
 						strncmp(bi->getParent()->getParent()->getName().str().c_str(), "klee", 4) != 0) {
-				std::cerr << "ki->info->line = " << ki->info->line << endl;
-					bi->dump();
 				bool isPossible = false;
 				std::set<std::string> gVarNames;
 				llvm::Instruction *optiInst = (llvm::Instruction *)bi->getOperand(0);
-				optiInst->dump();
 				optiInst = optiInst->getNextNode();
-				std::cerr << "optiInst : " << endl;
-				optiInst->dump();
 				while (optiInst->getOpcode() != Instruction::Br) {
 					KInstruction::BranchType temp = instOpGlobal(optiInst, gVarNames);
 					if (temp == KInstruction::possible) {
@@ -327,8 +326,6 @@ void ListenerService::preparation(Executor *executor) {
 					}
 					optiInst = optiInst->getNextNode();
 				}
-				std::cerr << "must br : " << endl;
-				optiInst->dump();
 				if (isPossible) {
 					std::cerr << "that's possible branch." << endl;
 					ki->trueBT = KInstruction::possible;

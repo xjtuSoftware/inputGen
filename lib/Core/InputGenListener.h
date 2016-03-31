@@ -53,7 +53,7 @@ public:
 	bool tryNegateFirstBr(std::string, Executor::BinTree *);
 	void tryNegateSecondBr(std::string, Executor::BinTree *);
 	void negateThisBranch(Executor::BinTree *);
-	std::string getBlockFullName(Instruction *inst, bool boolCond);
+	std::string getBlockFullName(BranchInst *bi, bool boolCond);
 
 private:
 	Executor *executor;

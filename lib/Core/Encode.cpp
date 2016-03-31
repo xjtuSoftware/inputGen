@@ -1001,6 +1001,7 @@ void Encode::buildifAndassert() {
 	}
 
 	unsigned int totalBrEvent = trace->brEvent.size();
+	std::cerr << "total br event : " << totalBrEvent << endl;
 	for (unsigned int i = 0; i < totalBrEvent; i++) {
 		event = trace->brEvent[i];
 //		cerr << "br : " << trace->brSymbolicExpr[i] <<"\n";
@@ -1249,13 +1250,16 @@ void Encode::buildMemoryModelFormula() {
 
 void Encode::preprocessWithIfFormula() {
 	unsigned ifSize = ifFormula.size();
+	std::cerr << "if size = " << ifSize << endl;
 
 	for (unsigned i = 0; i < ifSize; i++) {
 		// get if related with while out
 		Event *curr = ifFormula[i].first;
+		curr->inst->inst->dump();
 		assert(curr->isConditionIns);
 		BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-		std::string brName = bi->getOperand(1)->getName().str();
+		// operand 1 if.thenxxx
+		std::string brName = bi->getOperand(2)->getName().str();
 		if (strncmp(brName.c_str(), "if.", 3) != 0) {
 			continue;
 		}
@@ -1287,7 +1291,7 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 			}
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(1)->getName().str();
+				std::string biName = getBlockFullName(bi, false);
 				if (nameSet.find(biName) != nameSet.end()) {
 					negateSpecificBr(pureIfFormula[i]);
 				}
@@ -1298,7 +1302,7 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 			}
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(2)->getName().str();
+				std::string biName = getBlockFullName(bi, true);
 				if (nameSet.find(biName) != nameSet.end()) {
 					negateSpecificBr(pureIfFormula[i]);
 				}
@@ -1325,7 +1329,7 @@ void Encode::getPrefixForDefUse() {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
 				// get matching pair and sweep it out the matching pair set.
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string brName = bi->getOperand(2)->getName().str();
+				std::string brName = getBlockFullName(bi, true);
 				deleteMPFromThisExe(brName, i);
 				tryNegateSecondBr(brName, i);
 			}
@@ -1339,7 +1343,7 @@ void Encode::getPrefixForDefUse() {
 					// find it could be a matching pair exist.
 					// firstly, negate the this branch.
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-					std::string brName = bi->getOperand(1)->getName().str();
+					std::string brName = getBlockFullName(bi, false);
 					if (tryNegateFirstBr(brName, i)) {
 						negateSpecificBr(pureIfFormula[i]);
 					}
@@ -1349,7 +1353,7 @@ void Encode::getPrefixForDefUse() {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
 				// get matching pair and sweep it out the matching pair set.
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string brName = bi->getOperand(1)->getName().str();
+				std::string brName = getBlockFullName(bi, false);
 				deleteMPFromThisExe(brName, i);
 				tryNegateSecondBr(brName, i);
 			}
@@ -1359,7 +1363,7 @@ void Encode::getPrefixForDefUse() {
 					negateSpecificBr(pureIfFormula[i]);
 				} else if (curr->inst->trueBT == klee::KInstruction::definite) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-					std::string brName = bi->getOperand(2)->getName().str();
+					std::string brName = getBlockFullName(bi, true);
 					if (tryNegateFirstBr(brName, i)) {
 						negateSpecificBr(pureIfFormula[i]);
 					}
@@ -1394,7 +1398,7 @@ bool Encode::tryNegateFirstBr(std::string param, unsigned s) {
 		assert(curr->isConditionIns);
 		if (curr->condition) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = getBlockFullName(currInst, true);
 				if (nameSet.find(currName) != nameSet.end()) {
 					ret = true;
 					break;
@@ -1402,7 +1406,7 @@ bool Encode::tryNegateFirstBr(std::string param, unsigned s) {
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = getBlockFullName(currInst, false);
 				if (nameSet.find(currName) != nameSet.end()) {
 					ret = true;
 					break;
@@ -1410,6 +1414,22 @@ bool Encode::tryNegateFirstBr(std::string param, unsigned s) {
 			}
 		}
 	}
+	return ret;
+}
+
+std::string Encode::getBlockFullName(BranchInst *bi, bool brCond) {
+	std::string ret = "";
+
+	std::string blockName = "";
+	if (brCond)
+		blockName = bi->getOperand(2)->getName().str();
+	else
+		blockName = bi->getOperand(1)->getName().str();
+
+	std::string funcName = bi->getParent()->getParent()->getName().str();
+
+	ret = funcName + "." + blockName;
+
 	return ret;
 }
 
@@ -1438,7 +1458,7 @@ void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {
 		assert(curr->isConditionIns);
 		if (curr->condition) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = getBlockFullName(currInst, true);
 				if (nameSet.find(currName) != nameSet.end()) {
 					// there is a matching pair. delete from the mp set.
 					for (std::multimap<std::string, std::string>::iterator it = runtimeData->MP.begin(),
@@ -1451,7 +1471,7 @@ void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = getBlockFullName(currInst, false);
 				if (nameSet.find(currName) != nameSet.end()) {
 					for (std::multimap<std::string, std::string>::iterator it =
 							runtimeData->MP.begin(), ie = runtimeData->MP.end(); it != ie; it++) {
@@ -1511,10 +1531,12 @@ void Encode::negateSpecificBr(std::pair<Event*, expr>& specificPair) {
 	if (result == z3::sat) {
 		vector<Event *> vecEvent;
 		stringstream ss; // the prefix don't have a name. name = "";
+
 		computePrefix(vecEvent, specificPair.first);
-		Prefix *prefix = new Prefix(vecEvent, trace->createThreadPoint, ss.str());
+		Prefix *prefix = new Prefix(vecEvent, trace->createThreadPoint, "could be negated.");
 		runtimeData->addScheduleSet(prefix);
 
+		std::cerr << "a new prefix show up in encoding." << endl;
 		runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
 		runtimeData->intInputPrefix.insert(make_pair(prefix, runtimeData->intArgv));
 	} else {

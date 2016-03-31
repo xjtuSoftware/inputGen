@@ -90,6 +90,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 					brNode->size = width;
 					brNode->brTrue = (*currentEvent)->condition;
 					brNode->currEvent = (*currentEvent);
+
 					if (executor->headSentinel == NULL) {
 						executor->headSentinel = brNode;
 						executor->currTreeNode = brNode;
@@ -323,8 +324,17 @@ void InputGenListener::afterRunMethodAsMain() {
 		printSymbolicNode(head);
 	}
 
-//	std::cerr << "input generate calling start.\n";
+	std::cerr << "input generate calling start.\n";
 	inputGen(InputGenListener::DFS);
+	if (rdManager->symbolicInputPrefix.size() == 0) {
+		executor->setIsFinished();
+		Prefix *prefix = rdManager->getNextPrefix();
+		while (prefix) {
+			delete prefix;
+			prefix = NULL;
+			prefix = rdManager->getNextPrefix();
+		}
+	}
 //	if (rdManager->symbolicInputPrefix.size() == 0)
 //		executor->setIsFinished();
 }
@@ -354,8 +364,12 @@ void InputGenListener::inputGen(SearchType type) {
 		//DFS search
 		std::vector<ref<Expr> > constraints;
 		Executor::BinTree * head = executor->headSentinel;
-//		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
-		negateEachBr(head, constraints);
+		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
+//		negateEachBr(head, constraints);
+		negateBranchForDefUse(head);
+		freeMemoryBinTree(head);
+		executor->headSentinel = NULL;
+		executor->currTreeNode = NULL;
 //		DFSGenInput(head, constraints);
 		break;
 	}
@@ -379,6 +393,22 @@ void InputGenListener::freeMemoryBinTree(Executor::BinTree* head) {
 	}
 }
 
+std::string InputGenListener::getBlockFullName(BranchInst *bi, bool brCond) {
+	std::string ret = "";
+
+	std::string blockName = "";
+	if (brCond)
+		blockName = bi->getOperand(2)->getName().str();
+	else
+		blockName = bi->getOperand(1)->getName().str();
+
+	std::string funcName = bi->getParent()->getParent()->getName().str();
+
+	ret = funcName + "." + blockName;
+
+	return ret;
+}
+
 void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinTree *node) {
 	std::set<std::string> nameSet;
 	std::pair<std::multimap<std::string, std::string>::iterator,
@@ -396,35 +426,41 @@ void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinT
 
 	while (node != NULL) {
 		Event *curr = node->currEvent;
+		std::cerr << "delete passed id : " << curr->eventId << endl;
 		BranchInst *currInst = dyn_cast<BranchInst>(curr->inst->inst);
 		std::string currName = "";
 
 		assert(curr->isConditionIns);
 		if (node->brTrue) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = getBlockFullName(currInst, true);
 				if (nameSet.find(currName) != nameSet.end()) {
 					for (std::multimap<std::string, std::string>::iterator it =
 							rdManager->MP.begin(), ie = rdManager->MP.end(); it != ie; it++) {
 						if (it->first == paramName && it->second == currName) {
 							rdManager->MP.erase(it);
+							std::cerr << "true : delete MP : " << "p1 : " << it->first <<
+									", p2 = " << it->second << endl;
 						}
 					}
 				}
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = getBlockFullName(currInst, false);
 				if (nameSet.find(currName) != nameSet.end()) {
 					for (std::multimap<std::string, std::string>::iterator it =
 							rdManager->MP.begin(), ie = rdManager->MP.end(); it != ie; it++) {
 						if (it->first == paramName && it->second == currName) {
 							rdManager->MP.erase(it);
+							std::cerr << "false : delete MP : " << "p1 : " << it->first <<
+									", p2 = " << it->second << endl;
 						}
 					}
 				}
 			}
 		}
+		node = node->next;
 	}
 }
 
@@ -446,27 +482,33 @@ bool InputGenListener::tryNegateFirstBr(std::string paramName, Executor::BinTree
 
 	while (node != NULL) {
 		Event *curr = node->currEvent;
+		std::cerr << "first passed id : " << curr->eventId << endl;
 		BranchInst *currInst = dyn_cast<BranchInst>(curr->inst->inst);
 		std::string currName = "";
 
 		assert(curr->isConditionIns);
 		if (node->brTrue) {
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(2)->getName().str();
+				currName = getBlockFullName(currInst, true);
 				if (nameSet.find(currName) != nameSet.end()) {
+					std::cerr << "true negate first : p1: " << paramName <<
+							", p2 = " << currName << endl;
 					ret = true;
 					break;
 				}
 			}
 		} else {
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
-				currName = currInst->getOperand(1)->getName().str();
+				currName = getBlockFullName(currInst, false);
 				if (nameSet.find(currName) != nameSet.end()) {
+					std::cerr << "false negate first : p1: " << paramName <<
+							", p2 = " << currName << endl;
 					ret = true;
 					break;
 				}
 			}
 		}
+	node = node->next;
 	}
 	return ret;
 }
@@ -484,6 +526,7 @@ void InputGenListener::tryNegateSecondBr(std::string paramName, Executor::BinTre
 
 	while (node != NULL) {
 		Event *curr = node->currEvent;
+		std::cerr << "second passed id : " << curr->eventId << endl;
 		std::string currName = "";
 
 		assert(curr->isConditionIns);
@@ -493,9 +536,11 @@ void InputGenListener::tryNegateSecondBr(std::string paramName, Executor::BinTre
 			}
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(1)->getName().str();
+				std::string biName = getBlockFullName(bi, false);
 
 				if (nameSet.find(biName) != nameSet.end()) {
+					std::cerr << "true negate second p1 : " << paramName <<
+							", p2 : " << biName << endl;
 					negateThisBranch(node);
 				}
 			}
@@ -505,13 +550,16 @@ void InputGenListener::tryNegateSecondBr(std::string paramName, Executor::BinTre
 			}
 			if (curr->inst->trueBT == klee::KInstruction::definite) {
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-				std::string biName = bi->getOperand(2)->getName().str();
+				std::string biName = getBlockFullName(bi, true);
 
 				if (nameSet.find(biName) != nameSet.end()) {
+					std::cerr << "false negate second p1 : " << paramName <<
+							", p2 : " << biName << endl;
 					negateThisBranch(node);
 				}
 			}
 		}
+	node = node->next;
 	}
 }
 
@@ -528,18 +576,22 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 				// current execute is true.
 				if (curr->inst->trueBT == klee::KInstruction::definite) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-					std::string brName = bi->getOperand(1)->getName().str();
+					std::string brName = getBlockFullName(bi, true);
+					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					deleteMPFromCurrExe(brName, temp->next);
+					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					tryNegateSecondBr(brName, temp->next);
 				}
 				if (curr->inst->falseBT != klee::KInstruction::none) {
 					if (curr->inst->falseBT == klee::KInstruction::possible) {
 						// just negate this branch
+
 						negateThisBranch(temp);
 					} else if (curr->inst->falseBT == klee::KInstruction::definite) {
 						BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-						std::string brName = bi->getOperand(2)->getName().str();
+						std::string brName = getBlockFullName(bi, false);
 
+						std::cerr << "before pass argv id : " << curr->eventId << endl;
 						if (tryNegateFirstBr(brName, temp->next)) {
 							negateThisBranch(temp);
 						}
@@ -548,18 +600,21 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 			} else {
 				if (curr->inst->falseBT == klee::KInstruction::definite) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-					std::string brName = bi->getOperand(2)->getName().str();
+					std::string brName = getBlockFullName(bi, false);
+					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					deleteMPFromCurrExe(brName, temp->next);
+					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					tryNegateSecondBr(brName, temp->next);
 				}
 				if (curr->inst->trueBT != klee::KInstruction::none) {
-					if (curr->inst->falseBT == klee::KInstruction::possible) {
+					if (curr->inst->trueBT == klee::KInstruction::possible) {
 						// negate this branch
 						negateThisBranch(temp);
-					} else {
+					} else if (curr->inst->trueBT == klee::KInstruction::definite){
 						BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-						std::string brName = bi->getOperand(1)->getName().str();
+						std::string brName = getBlockFullName(bi, true);
 
+						std::cerr << "before pass argv id : " << curr->eventId << endl;
 						if (tryNegateFirstBr(brName, temp->next)) {
 							negateThisBranch(temp);
 						}
@@ -567,6 +622,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 				}
 			}
 		}
+	temp = temp->next;
 	}
 }
 

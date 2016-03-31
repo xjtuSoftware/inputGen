@@ -199,6 +199,7 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 		}
 		case Instruction::Br: {
 			BranchInst *bi = dyn_cast<BranchInst>(inst);
+//			bi->dump();
 			if (!bi->isUnconditional()) {
 				unsigned isAssert = 0;
 				string fileName = ki->info->file;

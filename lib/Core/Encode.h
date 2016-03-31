@@ -63,6 +63,7 @@ public:
 	void handlePossibleGVar();
 	void handleDefiniteBT(Event *, unsigned, unsigned);
 	void preprocessWithIfFormula();
+	std::string getBlockFullName(BranchInst *, bool);
 
 private:
 
