@@ -1311,6 +1311,51 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 	}
 }
 
+void Encode::getPrefixFromMP() {
+	preprocessWithIfFormula();
+
+	unsigned ifSize = pureIfFormula.size();
+	cerr << "Sum of branches: " << ifSize << "\n";
+
+	for (unsigned i = 0; i < ifSize; i++) {
+		Event *curr = pureIfFormula[i].first;
+
+		assert(curr->isConditionIns);
+		if (curr->condition) {
+			if (curr->inst->falseBT == KInstruction::possible) {
+				negateSpecificBr(pureIfFormula[i]);
+			} else if (curr->inst->falseBT == KInstruction::definite) {
+				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+				std::string brName = getBlockFullName(bi, false);
+
+				std::pair<std::multimap<std::string, std::string>::iterator,
+					std::multimap<std::string, std::string>::iterator> ret;
+
+				ret = runtimeData->MP.equal_range(brName);
+				if (ret.first != ret.second) {
+					negateSpecificBr(pureIfFormula[i]);
+				}
+			}
+		} else {
+			if (curr->inst->trueBT == KInstruction::possible) {
+				negateSpecificBr(pureIfFormula[i]);
+			} else if (curr->inst->trueBT == KInstruction::definite) {
+				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+				std::string brName = getBlockFullName(bi, true);
+
+				std::pair<std::multimap<std::string, std::string>::iterator,
+					std::multimap<std::string, std::string>::iterator> ret;
+
+				ret = runtimeData->MP.equal_range(brName);
+				if (ret.first != ret.second) {
+					negateSpecificBr(pureIfFormula[i]);
+				}
+			}
+		}
+	}
+
+}
+
 void Encode::getPrefixForDefUse() {
 	// get marked information about operating
 	// global variables from event related on if event.
@@ -1330,7 +1375,7 @@ void Encode::getPrefixForDefUse() {
 				// get matching pair and sweep it out the matching pair set.
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 				std::string brName = getBlockFullName(bi, true);
-				deleteMPFromThisExe(brName, i);
+//				deleteMPFromThisExe(brName, i);
 				tryNegateSecondBr(brName, i);
 			}
 			if (curr->inst->falseBT != klee::KInstruction::none) {
@@ -1354,7 +1399,7 @@ void Encode::getPrefixForDefUse() {
 				// get matching pair and sweep it out the matching pair set.
 				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 				std::string brName = getBlockFullName(bi, false);
-				deleteMPFromThisExe(brName, i);
+//				deleteMPFromThisExe(brName, i);
 				tryNegateSecondBr(brName, i);
 			}
 			if (curr->inst->trueBT != klee::KInstruction::none) {
@@ -1433,6 +1478,43 @@ std::string Encode::getBlockFullName(BranchInst *bi, bool brCond) {
 	return ret;
 }
 
+void Encode::deleteMPFromThisExe() {
+	unsigned size = trace->bbOpGvar.size();
+	for (unsigned i = 0; i < size; i++) {
+		std::string mp1 = trace->bbOpGvar[i];
+		bool flag = false;
+
+		std::set<std::string> nameSet;
+		std::pair<std::multimap<std::string, std::string>::iterator,
+			std::multimap<std::string, std::string>::iterator> ret;
+
+		ret = runtimeData->MP.equal_range(mp1);
+		if (ret.first != ret.second) {
+			for (std::multimap<std::string, std::string>::iterator it = ret.first,
+					ie = ret.second; it != ie; it++) {
+				nameSet.insert(it->second);
+			}
+		} else {
+			flag = true;
+		}
+
+		if (!flag) {
+			for (unsigned j = i + 1; j < size; j++) {
+				std::string mp2 = trace->bbOpGvar[j];
+
+				if (nameSet.find(mp2) != nameSet.end()) {
+					for (std::multimap<std::string, std::string>::iterator it =
+							runtimeData->MP.begin(), ie = runtimeData->MP.end(); it != ie; it++) {
+						if (it->first == mp1 && it->second == mp2) {
+							runtimeData->MP.erase(it);
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {
 	unsigned ifSize = pureIfFormula.size();
 
@@ -1492,9 +1574,11 @@ void Encode::handlePossibleGVar() {
 void Encode::negateSpecificBr(std::pair<Event*, expr>& specificPair) {
 	// negate this branch get the corresponding prefix.
 
+	std::cerr << "negate specific branch." << endl;
 	unsigned ifSize = ifFormula.size();
 	std::vector<std::string> vecArgvs;
-	int tt = 0;
+	int tt = 1;
+	std::cerr << "runtime data iArgc : " << runtimeData->iArgc << endl;
 	while (tt < runtimeData->iArgc) {
 		vecArgvs.push_back(std::string(runtimeData->pArgv[tt++]));
 	}

@@ -148,11 +148,12 @@ void ListenerService::endControl(Executor* executor){
 		Encode encode(&rdManager);
 		encode.buildifAndassert();
 //		encode.getPrefixForDefUse();
-//		/***
+		encode.getPrefixFromMP();
+		/***
 		if (encode.verify()) {
 			encode.check_if();
 		}
-//		*****/
+		*****/
 //		executor->getNewPrefix();
 		gettimeofday(&finish, NULL);
 		double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec
@@ -185,8 +186,10 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 		std::cerr << "size of prefix and input : " << rdManager.symbolicInputPrefix.size() << endl;
 		executor->prefix = it->first;
 		int i = 1;
+
 		std::vector<std::string>::size_type cnt = it->second.size();
-		assert((argc - 1) == cnt && "the number of computed argv is not equal argc");
+		std::cerr << "cnt = " << cnt << ", argc = " << argc << endl;
+		assert((unsigned long)(argc - 1) == cnt && "the number of computed argv is not equal argc");
 		unsigned int vecSize = it->second.size();
 		for (unsigned j = 0; j < vecSize; j++) {
 			unsigned t = 0;
@@ -271,7 +274,6 @@ KInstruction::BranchType ListenerService::instOpGlobal(
 			ret = KInstruction::definite;
 		}
 	} else if (inst->getOpcode() == Instruction::Store) {
-		StoreInst *si = dyn_cast<StoreInst>(inst);
 		std::string var1 = inst->getOperand(0)->getName().str();
 		std::string var2 = inst->getOperand(1)->getName().str();
 
@@ -283,6 +285,90 @@ KInstruction::BranchType ListenerService::instOpGlobal(
 			gVarNames.insert(var2);
 			ret = KInstruction::definite;
 		}
+	}
+
+	return ret;
+}
+
+KInstruction::BranchType ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
+	// handle entry BasicBlock.
+//	std::cerr << "entry name : " << bb->getName().str() << endl;
+	KInstruction::BranchType ret = KInstruction::none;
+	BasicBlock::iterator bit = bb->begin(), bie = bb->end(), bbIt = bb->end();
+	std::set<std::string> gVarNames;
+	llvm::Instruction *optiInst = NULL;
+
+	bbIt--;
+
+	if (bie->getOpcode() == Instruction::Br) {
+		optiInst = (llvm::Instruction *)bie->getOperand(0);
+	} else {
+		optiInst = dyn_cast<Instruction>(bie);
+	}
+
+	llvm::Instruction *tempInst = dyn_cast<Instruction>(bit);
+
+	while (tempInst != optiInst) {
+		if (bit->getOpcode() == Instruction::Load) {
+			LoadInst *li = dyn_cast<LoadInst>(bit);
+			std::string varName = bit->getOperand(0)->getName().str();
+//			std::cerr << "Load name : " << varName << endl;
+
+			if (li->getType()->getTypeID() == Type::PointerTyID) {
+				ret =  klee::KInstruction::possible;
+				break;
+			}
+
+			if (varName != "" && globalVarNameSet.find(varName) != globalVarNameSet.end()) {
+				gVarNames.insert(varName);
+				ret = klee::KInstruction::definite;
+			}
+		} else if (bit->getOpcode() == Instruction::Store) {
+			std::string var1 = bit->getOperand(0)->getName().str();
+			std::string var2 = bit->getOperand(1)->getName().str();
+
+			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
+				gVarNames.insert(var1);
+				ret = klee::KInstruction::definite;
+			}
+			if (var2 != "" && globalVarNameSet.find(var2) != globalVarNameSet.end()) {
+				gVarNames.insert(var2);
+				ret = klee::KInstruction::definite;
+			}
+		} else if (bit->getOpcode() == Instruction::Call) {
+			CallInst* ci = cast<CallInst>(bit);
+			unsigned argvs = ci->getNumArgOperands();
+
+			for (unsigned i = 0; i < argvs; i++) {
+				if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
+					return klee::KInstruction::possible;
+				}
+			}
+
+			Function* func = ci->getCalledFunction();
+			std::set<std::string> funcNameSet;
+
+			if (!func->isDeclaration()) {
+				std::set<std::string> opGVar;
+				klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
+				if (temp == klee::KInstruction::possible) {
+					ret = klee::KInstruction::possible;
+					break;
+				}
+				if (temp == klee::KInstruction::definite) {
+					ret = temp;
+					gVarNames.insert(opGVar.begin(), opGVar.end());
+				}
+			}
+		}
+		bit++;
+		tempInst = dyn_cast<Instruction>(bit);
+	}
+	if (ret == KInstruction::definite) {
+		std::string mp1Name = bb->getParent()->getName().str() + "." +
+				bb->getName().str();
+		rdManager.bbOpGVarName.insert(make_pair(bb, gVarNames));
+		rdManager.ifBB.insert(make_pair(mp1Name, bb));
 	}
 
 	return ret;
@@ -302,6 +388,9 @@ void ListenerService::preparation(Executor *executor) {
 
 	for (std::vector<KFunction*>::iterator it = executor->kmodule->functions.begin(),
 			ie = executor->kmodule->functions.end(); it != ie; it++) {
+//		std::cerr << "entry block name : " << (*it)->function->getName().str() << endl;
+//		(*it)->function->begin()->dump();
+		processEntryBlock((BasicBlock *)(*it)->function->begin());
 		KInstruction **instructions = (*it)->instructions;
 		for (unsigned i = 0; i < (*it)->numInstructions; i++) {
 			KInstruction *ki = instructions[i];
@@ -309,8 +398,24 @@ void ListenerService::preparation(Executor *executor) {
 
 			if (inst->getOpcode() == Instruction::Br) {
 				BranchInst *bi = cast<BranchInst>(inst);
-				if (bi->isUnconditional())
+				if (bi->isUnconditional()) {
+//					std::cerr << "unconditional jump" << endl;
+//					bi->getSuccessor(0)->dump();
+					std::set<string> nameSet;
+					BasicBlock *uncondBB = bi->getSuccessor(0);
+//					std::cerr << "uncond bb name : " << uncondBB->getName().str() << endl;
+					if (strncmp(uncondBB->getParent()->getName().str().c_str(), "klee", 4) != 0) {
+						KInstruction::BranchType temp  = basicBlockOpGlobal(uncondBB, nameSet);
+						if (temp == KInstruction::definite) {
+							std::string mp1Name = uncondBB->getParent()->getName().str() +
+									"." + uncondBB->getName().str();
+							rdManager.bbOpGVarName.insert(make_pair(uncondBB, nameSet));
+							rdManager.ifBB.insert(make_pair(mp1Name, uncondBB));
+
+						}
+					}
 					continue;
+				}
 				if (strncmp(bi->getOperand(1)->getName().str().c_str(), "if.else", 7) == 0 &&
 						strncmp(bi->getOperand(2)->getName().str().c_str(), "if.then", 7) == 0 &&
 						strncmp(bi->getParent()->getParent()->getName().str().c_str(), "klee", 4) != 0) {
@@ -380,7 +485,65 @@ void ListenerService::preparation(Executor *executor) {
 		}
 		}
 	}
-	getMatchingPair(executor);
+//	getMatchingPair(executor);
+	getMPFromBlockPair(executor);
+}
+
+void ListenerService::getMPFromBlockPair(Executor *executor) {
+	std::map<BasicBlock *, std::set<string> >::iterator mit = rdManager.bbOpGVarName.begin(),
+			mie = rdManager.bbOpGVarName.end();
+	unsigned cnt = 0;
+
+	for (; mit != mie; mit++, cnt++) {
+		unsigned delta = 0;
+		std::set<std::string> nameSet1 = mit->second;
+		std::map<BasicBlock *, std::set<string> >::iterator innerIt = rdManager.bbOpGVarName.begin(),
+				innerIe = rdManager.bbOpGVarName.end();
+		while (delta <= cnt) {
+			innerIt++;
+			delta++;
+		}
+		std::string branchName1 = mit->first->getParent()->getName().str() +
+				"." + mit->first->getName().str();
+
+		for (; innerIt != innerIe; innerIt++) {
+			if (mit->first->getParent()->getName().str() ==
+					innerIt->first->getParent()->getName().str())
+				continue;
+
+			std::set<std::string> nameSet2 = innerIt->second;
+			std::string branchName2 = innerIt->first->getParent()->getName().str() +
+					"." + innerIt->first->getName().str();
+
+			unsigned vecSize = nameSet1.size() > nameSet2.size() ? nameSet1.size() : nameSet2.size();
+			std::set<std::string>::iterator firstIt = nameSet1.begin(), firstIe = nameSet1.end();
+			std::set<std::string>::iterator secondIt = nameSet2.begin(), secondIe = nameSet2.end();
+			std::vector<std::string> intersectRet(vecSize);
+			std::vector<std::string>::iterator vecIt;
+
+			vecIt = std::set_intersection(firstIt, firstIe, secondIt, secondIe, intersectRet.begin());
+
+			intersectRet.resize(vecIt - intersectRet.begin());
+
+			if (intersectRet.size() > 0) {
+				// a matching pair found. store branches of the two br statement.
+				// like pair<if.then, if.then21> pair<if.then, if.else>
+				rdManager.MP.insert(std::make_pair(branchName1, branchName2));
+				rdManager.MP.insert(std::make_pair(branchName2, branchName1));
+
+				std::cerr << "MP first : " << branchName1 <<
+						", second : " << branchName2 << endl;
+				std::cerr << "MP size = " << rdManager.MP.size() << endl;
+			}
+		}
+	}
+	std::multimap<std::string, std::string>::iterator mmit = rdManager.MP.begin(),
+			mmie = rdManager.MP.end();
+
+	for (; mmit != mmie; mmit++) {
+		std::cerr << mmit->first << " : " << mmit->second << endl;
+	}
+	std::cerr << "MP size = " << rdManager.MP.size() << endl;
 }
 
 void ListenerService::getMatchingPair(Executor *executor) {
@@ -459,7 +622,7 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 		if (bit->getOpcode() == Instruction::Load) {
 			LoadInst *li = dyn_cast<LoadInst>(bit);
 			std::string varName = bit->getOperand(0)->getName().str();
-			std::cerr << "Load name : " << varName << endl;
+//			std::cerr << "Load name : " << varName << endl;
 
 			if (li->getType()->getTypeID() == Type::PointerTyID) {
 				return klee::KInstruction::possible;
@@ -481,7 +644,9 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 				allGvar.insert(var2);
 				ret = klee::KInstruction::definite;
 			}
-		}else if (bit->getOpcode() == Instruction::Br) {
+		}
+		/*
+		else if (bit->getOpcode() == Instruction::Br) {
 				 BranchInst *bi = cast<BranchInst>(bit);
 			if (bi->isUnconditional())
 				continue;
@@ -497,7 +662,7 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 			if (ret1 == klee::KInstruction::definite ||
 					ret2 == klee::KInstruction::definite)
 				ret = klee::KInstruction::definite;
-		} else if (bit->getOpcode() == Instruction::Call) {
+		}*/ else if (bit->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(bit);
 			unsigned argvs = ci->getNumArgOperands();
 

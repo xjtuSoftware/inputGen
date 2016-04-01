@@ -366,7 +366,8 @@ void InputGenListener::inputGen(SearchType type) {
 		Executor::BinTree * head = executor->headSentinel;
 		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
 //		negateEachBr(head, constraints);
-		negateBranchForDefUse(head);
+//		negateBranchForDefUse(head);
+		negateBranchForDefUse(head, true);
 		freeMemoryBinTree(head);
 		executor->headSentinel = NULL;
 		executor->currTreeNode = NULL;
@@ -438,9 +439,10 @@ void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinT
 					for (std::multimap<std::string, std::string>::iterator it =
 							rdManager->MP.begin(), ie = rdManager->MP.end(); it != ie; it++) {
 						if (it->first == paramName && it->second == currName) {
-							rdManager->MP.erase(it);
+
 							std::cerr << "true : delete MP : " << "p1 : " << it->first <<
 									", p2 = " << it->second << endl;
+							rdManager->MP.erase(it);
 						}
 					}
 				}
@@ -452,9 +454,10 @@ void InputGenListener::deleteMPFromCurrExe(std::string paramName, Executor::BinT
 					for (std::multimap<std::string, std::string>::iterator it =
 							rdManager->MP.begin(), ie = rdManager->MP.end(); it != ie; it++) {
 						if (it->first == paramName && it->second == currName) {
-							rdManager->MP.erase(it);
+
 							std::cerr << "false : delete MP : " << "p1 : " << it->first <<
 									", p2 = " << it->second << endl;
+							rdManager->MP.erase(it);
 						}
 					}
 				}
@@ -560,6 +563,52 @@ void InputGenListener::tryNegateSecondBr(std::string paramName, Executor::BinTre
 			}
 		}
 	node = node->next;
+	}
+}
+
+void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag) {
+	Executor::BinTree *temp = head;
+
+	while (temp != NULL) {
+		if (temp->isSwitch) {
+			// current branch is a switch statement.
+		} else {
+			Event *curr = temp->currEvent;
+
+			assert(curr->isConditionIns);
+			if (temp->brTrue) {
+				if (curr->inst->falseBT == KInstruction::possible) {
+					negateThisBranch(temp);
+				} else if (curr->inst->falseBT == KInstruction::definite) {
+					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+					std::string brName = getBlockFullName(bi, false);
+
+					std::pair<std::multimap<std::string, std::string>::iterator,
+						std::multimap<std::string, std::string>::iterator> ret;
+
+					ret = rdManager->MP.equal_range(brName);
+					if (ret.first != ret.second) {
+						negateThisBranch(temp);
+					}
+				}
+			} else {
+				if (curr->inst->trueBT == KInstruction::possible) {
+					negateThisBranch(temp);
+				} else if (curr->inst->trueBT == KInstruction::definite) {
+					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+					std::string brName = getBlockFullName(bi, true);
+
+					std::pair<std::multimap<std::string, std::string>::iterator,
+						std::multimap<std::string, std::string>::iterator> ret;
+
+					ret = rdManager->MP.equal_range(brName);
+					if (ret.first != ret.second) {
+						negateThisBranch(temp);
+					}
+				}
+			}
+		}
+		temp = temp->next;
 	}
 }
 
@@ -774,6 +823,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			}
 		}
 		argvStr[i] = '\0';
+		std::cerr << "argv str : " << argvStr << endl;
 		argvValue.push_back(std::string(argvStr));
 		}
 
@@ -785,6 +835,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		std::map<std::string, unsigned> tempMap;
 		tempMap.insert(rdManager->intArgv.begin(), rdManager->intArgv.end());
 		rdManager->symbolicInputPrefix.insert(make_pair(prefix, argvValue));
+		std::cerr << "argv value size = " << argvValue.size() << endl;
 		rdManager->intInputPrefix.insert(make_pair(prefix, tempMap));
 	} else if (result == z3::unsat) {
 		std::cerr << "unsat inputGenListener.\n";

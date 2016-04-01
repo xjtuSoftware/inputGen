@@ -49,6 +49,7 @@ public:
 	void getPrefixFromPath(std::vector<Event*>&, Event*);
 
 	void negateBranchForDefUse(Executor::BinTree *);
+	void negateBranchForDefUse(Executor::BinTree *, bool flag);
 	void deleteMPFromCurrExe(std::string, Executor::BinTree*);
 	bool tryNegateFirstBr(std::string, Executor::BinTree *);
 	void tryNegateSecondBr(std::string, Executor::BinTree *);

@@ -72,6 +72,9 @@ public:
 	std::vector<Event*> brEvent;
 	std::vector<Event*> assertEvent;
 
+	std::vector<std::string> bbOpGvar;
+	std::string currBB;
+
 	Trace();
 
 	virtual ~Trace();

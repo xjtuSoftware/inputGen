@@ -47,6 +47,7 @@ namespace klee {
     BranchType bt;
     BranchType trueBT;
     BranchType falseBT;
+    BranchType uncondBT;
 
     bool trueBlockHasGlobal;
     bool falseBlockHasGlobal;

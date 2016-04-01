@@ -146,6 +146,21 @@ void PSOListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = rdManager->getCurrentTrace();
 	Instruction* inst = ki->inst;
+	std::string bbFullName = inst->getParent()->getParent()->getName().str() +
+			"." + inst->getParent()->getName().str();
+	std::map<llvm::BasicBlock*, std::set<std::string> >::iterator bbIt =
+			rdManager->bbOpGVarName.find(inst->getParent());
+	if (bbIt != rdManager->bbOpGVarName.end()) {
+		if (trace->bbOpGvar.size() == 0) {
+			trace->bbOpGvar.push_back(bbFullName);
+			std::cerr << "bbFullName : " << bbFullName << endl;
+		} else {
+			if (trace->bbOpGvar[trace->bbOpGvar.size() - 1] != bbFullName) {
+				trace->bbOpGvar.push_back(bbFullName);
+				std::cerr << "bbFullName : " << bbFullName << endl;
+			}
+		}
+	}
 	Thread* thread = state.currentThread;
 	Event* item = NULL;
 	KModule* kmodule = executor->kmodule;

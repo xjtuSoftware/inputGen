@@ -30,6 +30,7 @@ private:
 		funcOpGlobal(std::set<std::string>&, llvm::Function *, std::set<std::string>&);
 	klee::KInstruction::BranchType instOpGlobal(llvm::Instruction *, std::set<std::string> &);
 	std::string getBlockFullName(llvm::BranchInst *, bool brCond);
+	klee::KInstruction::BranchType processEntryBlock(llvm::BasicBlock *);
 
 	bool searchBasicBlock(llvm::BasicBlock *basicBlock);
 	bool searchFuncion(std::set<std::string> &, llvm::Function *function);
@@ -46,6 +47,7 @@ public:
 
 	void preparation(Executor* executor);
 	void getMatchingPair(Executor *executor);
+	void getMPFromBlockPair(Executor *executor);
 	void beforeRunMethodAsMain(ExecutionState &initialState);
 	void executeInstruction(ExecutionState &state, KInstruction *ki);
 	void instructionExecuted(ExecutionState &state, KInstruction *ki);
