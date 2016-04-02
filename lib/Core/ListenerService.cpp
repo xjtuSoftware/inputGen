@@ -537,13 +537,13 @@ void ListenerService::getMPFromBlockPair(Executor *executor) {
 			}
 		}
 	}
-	std::multimap<std::string, std::string>::iterator mmit = rdManager.MP.begin(),
-			mmie = rdManager.MP.end();
-
-	for (; mmit != mmie; mmit++) {
-		std::cerr << mmit->first << " : " << mmit->second << endl;
-	}
-	std::cerr << "MP size = " << rdManager.MP.size() << endl;
+//	std::multimap<std::string, std::string>::iterator mmit = rdManager.MP.begin(),
+//			mmie = rdManager.MP.end();
+//
+//	for (; mmit != mmie; mmit++) {
+//		std::cerr << mmit->first << " : " << mmit->second << endl;
+//	}
+//	std::cerr << "MP size = " << rdManager.MP.size() << endl;
 }
 
 void ListenerService::getMatchingPair(Executor *executor) {
