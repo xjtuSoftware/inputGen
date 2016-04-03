@@ -48,6 +48,7 @@ public:
 	void preparation(Executor* executor);
 	void getMatchingPair(Executor *executor);
 	void getMPFromBlockPair(Executor *executor);
+	bool belongToRuntimeDir(const std::string &fileName);
 	void beforeRunMethodAsMain(ExecutionState &initialState);
 	void executeInstruction(ExecutionState &state, KInstruction *ki);
 	void instructionExecuted(ExecutionState &state, KInstruction *ki);

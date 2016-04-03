@@ -153,11 +153,11 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 	if (bbIt != rdManager->bbOpGVarName.end()) {
 		if (trace->bbOpGvar.size() == 0) {
 			trace->bbOpGvar.push_back(bbFullName);
-			std::cerr << "bbFullName : " << bbFullName << endl;
+//			std::cerr << "bbFullName : " << bbFullName << endl;
 		} else {
 			if (trace->bbOpGvar[trace->bbOpGvar.size() - 1] != bbFullName) {
 				trace->bbOpGvar.push_back(bbFullName);
-				std::cerr << "bbFullName : " << bbFullName << endl;
+//				std::cerr << "bbFullName : " << bbFullName << endl;
 			}
 		}
 	}
@@ -482,10 +482,10 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				unsigned argsNum = inst->getNumOperands();
 				for (unsigned i = 0; i < (argsNum - 1); i++) {
 					ref<Expr> address = executor->eval(ki, i + 1, thread).value;
-					std::cerr << " execution num address : " << address->getWidth() << std::endl;
+//					std::cerr << " execution num address : " << address->getWidth() << std::endl;
 					std::string varName = inst->getOperand(i)->getName().str();
 					Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
-					std::cerr << "implAtoI width = " << width << std::endl;
+//					std::cerr << "implAtoI width = " << width << std::endl;
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, address);
 					if (success) {

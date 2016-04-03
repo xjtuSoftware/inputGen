@@ -1250,12 +1250,12 @@ void Encode::buildMemoryModelFormula() {
 
 void Encode::preprocessWithIfFormula() {
 	unsigned ifSize = ifFormula.size();
-	std::cerr << "if size = " << ifSize << endl;
+//	std::cerr << "if size = " << ifSize << endl;
 
 	for (unsigned i = 0; i < ifSize; i++) {
 		// get if related with while out
 		Event *curr = ifFormula[i].first;
-		curr->inst->inst->dump();
+//		curr->inst->inst->dump();
 		assert(curr->isConditionIns);
 		BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 		// operand 1 if.thenxxx
@@ -1312,6 +1312,9 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 }
 
 void Encode::getPrefixFromMP() {
+
+	deleteMPFromThisExe();
+
 	preprocessWithIfFormula();
 
 	unsigned ifSize = pureIfFormula.size();
@@ -1479,6 +1482,8 @@ std::string Encode::getBlockFullName(BranchInst *bi, bool brCond) {
 }
 
 void Encode::deleteMPFromThisExe() {
+//	std::cerr << "before MP left size = " << runtimeData->MP.size() << endl;
+
 	unsigned size = trace->bbOpGvar.size();
 	for (unsigned i = 0; i < size; i++) {
 		std::string mp1 = trace->bbOpGvar[i];
@@ -1507,12 +1512,16 @@ void Encode::deleteMPFromThisExe() {
 							runtimeData->MP.begin(), ie = runtimeData->MP.end(); it != ie; it++) {
 						if (it->first == mp1 && it->second == mp2) {
 							runtimeData->MP.erase(it);
+
+//							std::cerr << "delete pair mp1 = " << mp1 << ", mp2 = " << mp2 << endl;
 						}
 					}
 				}
 			}
 		}
 	}
+
+//	std::cerr << "MP left size = " << runtimeData->MP.size() << endl;
 }
 
 void Encode::deleteMPFromThisExe(std::string brParamName, unsigned s) {

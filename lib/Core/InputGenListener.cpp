@@ -317,12 +317,12 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 }
 
 void InputGenListener::afterRunMethodAsMain() {
-	std::cerr << "print the symbolic tree to debug.\n";
-
-	if (executor->headSentinel != NULL) {
-		Executor::BinTree * head = executor->headSentinel;
-		printSymbolicNode(head);
-	}
+//	std::cerr << "print the symbolic tree to debug.\n";
+//
+//	if (executor->headSentinel != NULL) {
+//		Executor::BinTree * head = executor->headSentinel;
+//		printSymbolicNode(head);
+//	}
 
 	std::cerr << "input generate calling start.\n";
 	inputGen(InputGenListener::DFS);
@@ -364,7 +364,7 @@ void InputGenListener::inputGen(SearchType type) {
 		//DFS search
 		std::vector<ref<Expr> > constraints;
 		Executor::BinTree * head = executor->headSentinel;
-		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
+//		std::cerr << "start execute in DFS, constraints size = " << constraints.size() << std::endl;
 //		negateEachBr(head, constraints);
 //		negateBranchForDefUse(head);
 		negateBranchForDefUse(head, true);
@@ -776,7 +776,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			sr << m.eval(realExpr);
 			int temp = atoi(sr.str().c_str());
 			char ch = toascii(temp);
-			std::cerr << "temp = " << temp << ", ch = " << ch << std::endl;
+//			std::cerr << "temp = " << temp << ", ch = " << ch << std::endl;
 			executor->charInfo[it->first] = ch;
 			sr.str("");
 		}
@@ -787,18 +787,18 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			z3::expr tempExpr = z3_ctx.bv_const(iit->first.c_str(), BIT_WIDTH);
 			z3::expr realExpr = z3::to_expr(z3_ctx, Z3_mk_bv2int(z3_ctx, tempExpr, false));
 			sr << m.eval(realExpr);
-			std::cerr << "sr = " << sr.str().c_str() << std::endl;
+//			std::cerr << "sr = " << sr.str().c_str() << std::endl;
 			int temp = atoi(sr.str().c_str());
-			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
+//			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
 			rdManager->intArgv[iit->first] = (unsigned)temp;
 			sr.str("");
 		}
-		std::cerr << "print the char.\n";
-		std::map<std::string, char>::iterator mit =
-				executor->charInfo.begin(), mie = executor->charInfo.end();
-		for (; mit != mie; mit++) {
-			std::cerr << mit->first << " : " << mit->second << std::endl;
-		}
+//		std::cerr << "print the char.\n";
+//		std::map<std::string, char>::iterator mit =
+//				executor->charInfo.begin(), mie = executor->charInfo.end();
+//		for (; mit != mie; mit++) {
+//			std::cerr << mit->first << " : " << mit->second << std::endl;
+//		}
 		//need complement in order to get the corresponding concrete value.
 		std::vector<std::string> argvValue;
 		std::map<std::string, char>::iterator mmit = executor->charInfo.begin(),
@@ -823,7 +823,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			}
 		}
 		argvStr[i] = '\0';
-		std::cerr << "argv str : " << argvStr << endl;
+//		std::cerr << "argv str : " << argvStr << endl;
 		argvValue.push_back(std::string(argvStr));
 		}
 
@@ -835,7 +835,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		std::map<std::string, unsigned> tempMap;
 		tempMap.insert(rdManager->intArgv.begin(), rdManager->intArgv.end());
 		rdManager->symbolicInputPrefix.insert(make_pair(prefix, argvValue));
-		std::cerr << "argv value size = " << argvValue.size() << endl;
+//		std::cerr << "argv value size = " << argvValue.size() << endl;
 		rdManager->intInputPrefix.insert(make_pair(prefix, tempMap));
 	} else if (result == z3::unsat) {
 		std::cerr << "unsat inputGenListener.\n";

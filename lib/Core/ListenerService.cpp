@@ -179,16 +179,16 @@ void ListenerService::endControl(Executor* executor){
 }
 
 void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* executor) {
-	std::cerr << "prefix set size = " << rdManager.getPrefixSetSize() << endl;
+//	std::cerr << "prefix set size = " << rdManager.getPrefixSetSize() << endl;
 	if (rdManager.runState == 0 && rdManager.symbolicInputPrefix.size() != 0) {
 		std::map<Prefix*, std::vector<std::string> >::iterator it =
 				rdManager.symbolicInputPrefix.begin();
-		std::cerr << "size of prefix and input : " << rdManager.symbolicInputPrefix.size() << endl;
+//		std::cerr << "size of prefix and input : " << rdManager.symbolicInputPrefix.size() << endl;
 		executor->prefix = it->first;
 		int i = 1;
 
 		std::vector<std::string>::size_type cnt = it->second.size();
-		std::cerr << "cnt = " << cnt << ", argc = " << argc << endl;
+//		std::cerr << "cnt = " << cnt << ", argc = " << argc << endl;
 		assert((unsigned long)(argc - 1) == cnt && "the number of computed argv is not equal argc");
 		unsigned int vecSize = it->second.size();
 		for (unsigned j = 0; j < vecSize; j++) {
@@ -290,7 +290,8 @@ KInstruction::BranchType ListenerService::instOpGlobal(
 	return ret;
 }
 
-KInstruction::BranchType ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
+KInstruction::BranchType
+ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 	// handle entry BasicBlock.
 //	std::cerr << "entry name : " << bb->getName().str() << endl;
 	KInstruction::BranchType ret = KInstruction::none;
@@ -370,6 +371,11 @@ KInstruction::BranchType ListenerService::processEntryBlock(llvm::BasicBlock *bb
 		rdManager.bbOpGVarName.insert(make_pair(bb, gVarNames));
 		rdManager.ifBB.insert(make_pair(mp1Name, bb));
 	}
+//	std::cerr << "entry block:" << endl;
+//	for (std::set<std::string>::iterator it = gVarNames.begin(),
+//			ie = gVarNames.end(); it != ie; it++) {
+//		std::cerr << "var : " << *it << endl;
+//	}
 
 	return ret;
 }
@@ -396,9 +402,11 @@ void ListenerService::preparation(Executor *executor) {
 			KInstruction *ki = instructions[i];
 			Instruction *inst = ki->inst;
 
-			if (inst->getOpcode() == Instruction::Br) {
+			if (inst->getOpcode() == Instruction::Br &&
+					!belongToRuntimeDir(ki->info->file)) {
 				BranchInst *bi = cast<BranchInst>(inst);
-				if (bi->isUnconditional()) {
+				if (bi->isUnconditional() &&
+						strncmp(bi->getParent()->getParent()->getName().str().c_str(), "klee", 4) != 0) {
 //					std::cerr << "unconditional jump" << endl;
 //					bi->getSuccessor(0)->dump();
 					std::set<string> nameSet;
@@ -416,8 +424,8 @@ void ListenerService::preparation(Executor *executor) {
 					}
 					continue;
 				}
-				if (strncmp(bi->getOperand(1)->getName().str().c_str(), "if.else", 7) == 0 &&
-						strncmp(bi->getOperand(2)->getName().str().c_str(), "if.then", 7) == 0 &&
+				if (/*strncmp(bi->getOperand(1)->getName().str().c_str(), "if.else", 7) == 0 &&
+						strncmp(bi->getOperand(2)->getName().str().c_str(), "if.then", 7) == 0 && */
 						strncmp(bi->getParent()->getParent()->getName().str().c_str(), "klee", 4) != 0) {
 				bool isPossible = false;
 				std::set<std::string> gVarNames;
@@ -437,23 +445,27 @@ void ListenerService::preparation(Executor *executor) {
 					ki->falseBT = KInstruction::possible;
 				} else {
 					// handle true block.
-					bi->dump();
+//					bi->dump();
 					std::set<std::string> thenNames;
 					thenNames.insert(gVarNames.begin(), gVarNames.end());
 					std::string thenName = bi->getOperand(2)->getName().str();
-					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-					std::cerr << "then block name : " << thenName << endl;
+//					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+//					std::cerr << "then block name : " << thenName << endl;
 					BasicBlock *bbThen = bi->getSuccessor(0);
 					ki->trueBT = basicBlockOpGlobal(bbThen, thenNames);
-					std::set<std::string>::iterator thenIt = thenNames.begin(),
-							thenIe = thenNames.end();
-					for (; thenIt != thenIe; thenIt++) {
-						std::cerr << "then global var: " << *thenIt << endl;
-					}
+//					std::set<std::string>::iterator thenIt = thenNames.begin(),
+//							thenIe = thenNames.end();
+////					for (; thenIt != thenIe; thenIt++) {
+////						std::cerr << "then global var: " << *thenIt << endl;
+////					}
 					std::string fullThen = getBlockFullName(bi, true);
-					std::cerr << "true full name : " << fullThen << endl;
-					std::cerr << "ki->trueBT : " << ki->trueBT << endl;
-					std::cerr << "=========================" << endl;
+//					std::cerr << "true full name : " << fullThen << endl;
+//					bi->dump();
+//					std::cerr << "file name bool value : " << belongToRuntimeDir(ki->info->file) << endl;
+//					std::cerr << "file = " << ki->info->file << ", line = " <<
+//							ki->info->line << ", id = " << ki->info->id << endl;
+//					std::cerr << "ki->trueBT : " << ki->trueBT << endl;
+//					std::cerr << "=========================" << endl;
 					if (ki->trueBT == KInstruction::definite) {
 						rdManager.bbOpGVarName.insert(make_pair(bbThen, thenNames));
 						rdManager.ifBB.insert(make_pair(fullThen, bbThen));
@@ -463,19 +475,19 @@ void ListenerService::preparation(Executor *executor) {
 					std::set<std::string> elseNames;
 					elseNames.insert(gVarNames.begin(), gVarNames.end());
 					std::string elseName = bi->getOperand(1)->getName().str();
-					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
-					std::cerr << "else block name : " << elseName << endl;
+//					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
+//					std::cerr << "else block name : " << elseName << endl;
 					BasicBlock *bbElse = bi->getSuccessor(1);
 					ki->falseBT = basicBlockOpGlobal(bbElse, elseNames);
 					std::string fullElse = getBlockFullName(bi, false);
-					std::set<std::string>::iterator elseIt = elseNames.begin(),
-							elseIe = elseNames.end();
-					for (; elseIt != elseIe; elseIt++) {
-						std::cerr << "else global var: " << *elseIt << endl;
-					}
-					std::cerr << "false full name : " << fullElse << endl;
-					std::cerr << "ki->falseBT : " << ki->falseBT << endl;
-					std::cerr << "=========================" << endl;
+//					std::set<std::string>::iterator elseIt = elseNames.begin(),
+//							elseIe = elseNames.end();
+//					for (; elseIt != elseIe; elseIt++) {
+//						std::cerr << "else global var: " << *elseIt << endl;
+//					}
+//					std::cerr << "false full name : " << fullElse << endl;
+//					std::cerr << "ki->falseBT : " << ki->falseBT << endl;
+//					std::cerr << "=========================" << endl;
 					if (ki->falseBT == KInstruction::definite) {
 						rdManager.bbOpGVarName.insert(make_pair(bbElse, elseNames));
 						rdManager.ifBB.insert(make_pair(fullElse, bbElse));
@@ -487,6 +499,40 @@ void ListenerService::preparation(Executor *executor) {
 	}
 //	getMatchingPair(executor);
 	getMPFromBlockPair(executor);
+}
+
+bool ListenerService::belongToRuntimeDir(const std::string &fileName) {
+	unsigned len = fileName.size();
+//	std::cerr << "len = " << len <<  endl;
+	int left = -1;
+	int slashNum = 0;
+	std::string name= "";
+
+	for (int i = len - 1; i >= 0; i--) {
+		if (fileName[i] == '/') {
+			slashNum++;
+			if (slashNum == 3) {
+				left = i;
+				break;
+			}
+		}
+	}
+
+//	std::cerr << "left = " << left << ", " << fileName[left] << endl;
+	if (left == -1)
+		return false;
+	else {
+		for (int i = left + 1; fileName[i] != '/'; i++) {
+			name += fileName[i];
+//			std::cerr << "file name i " << fileName[i] << endl;
+		}
+	}
+
+//	std::cerr << "name = " << name << endl;
+	if (name == "runtime")
+		return true;
+	else
+		return false;
 }
 
 void ListenerService::getMPFromBlockPair(Executor *executor) {
@@ -531,9 +577,9 @@ void ListenerService::getMPFromBlockPair(Executor *executor) {
 				rdManager.MP.insert(std::make_pair(branchName1, branchName2));
 				rdManager.MP.insert(std::make_pair(branchName2, branchName1));
 
-				std::cerr << "MP first : " << branchName1 <<
-						", second : " << branchName2 << endl;
-				std::cerr << "MP size = " << rdManager.MP.size() << endl;
+//				std::cerr << "MP first : " << branchName1 <<
+//						", second : " << branchName2 << endl;
+//				std::cerr << "MP size = " << rdManager.MP.size() << endl;
 			}
 		}
 	}

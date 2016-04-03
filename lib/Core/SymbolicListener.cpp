@@ -322,8 +322,8 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 							ObjectState *wos = state.addressSpace.getWriteable(mo, os);
 							ref<Expr> offset = mo->getOffsetExpr(address);
 							ref<Expr> realExpr = ConstantExpr::create(it->second, sizeof(int) * 8);
-							std::cerr << "real expr in write, second = " << it->second << std::endl;
-							realExpr->dump();
+//							std::cerr << "real expr in write, second = " << it->second << std::endl;
+//							realExpr->dump();
 							wos->write(offset, realExpr);
 					} else {
 						assert(0 && "cannot get the corresponding op in PSOListener(else).\n");
