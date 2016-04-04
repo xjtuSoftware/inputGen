@@ -1336,6 +1336,11 @@ void Encode::getPrefixFromMP() {
 
 				ret = runtimeData->MP.equal_range(brName);
 				if (ret.first != ret.second) {
+//					std::cerr << "brName : " << brName << endl;
+//					for (std::multimap<std::string, std::string>::iterator it = ret.first,
+//							ie = ret.second; it != ie; it++) {
+//						std::cerr << "first : " << it->first << ", second : " << it->second << endl;
+//					}
 					negateSpecificBr(pureIfFormula[i]);
 				}
 			}
@@ -1351,6 +1356,11 @@ void Encode::getPrefixFromMP() {
 
 				ret = runtimeData->MP.equal_range(brName);
 				if (ret.first != ret.second) {
+//					std::cerr << "brName : " << brName << endl;
+//					for (std::multimap<std::string, std::string>::iterator it = ret.first,
+//							ie = ret.second; it != ie; it++) {
+//						std::cerr << "first : " << it->first << ", second : " << it->second << endl;
+//					}
 					negateSpecificBr(pureIfFormula[i]);
 				}
 			}
@@ -1487,6 +1497,7 @@ void Encode::deleteMPFromThisExe() {
 	unsigned size = trace->bbOpGvar.size();
 	for (unsigned i = 0; i < size; i++) {
 		std::string mp1 = trace->bbOpGvar[i];
+//		std::cerr << "map of delete mp1: " << mp1 << endl;
 		bool flag = false;
 
 		std::set<std::string> nameSet;
@@ -1513,6 +1524,9 @@ void Encode::deleteMPFromThisExe() {
 						if (it->first == mp1 && it->second == mp2) {
 							runtimeData->MP.erase(it);
 
+//							if (mp1 == "t2.if.else4") {
+//								std::cerr << "mp1 = t2.if.else4, mp2 = " << mp2 << endl;
+//							}
 //							std::cerr << "delete pair mp1 = " << mp1 << ", mp2 = " << mp2 << endl;
 						}
 					}
@@ -1587,7 +1601,7 @@ void Encode::negateSpecificBr(std::pair<Event*, expr>& specificPair) {
 	unsigned ifSize = ifFormula.size();
 	std::vector<std::string> vecArgvs;
 	int tt = 1;
-	std::cerr << "runtime data iArgc : " << runtimeData->iArgc << endl;
+//	std::cerr << "runtime data iArgc : " << runtimeData->iArgc << endl;
 	while (tt < runtimeData->iArgc) {
 		vecArgvs.push_back(std::string(runtimeData->pArgv[tt++]));
 	}

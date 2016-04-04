@@ -324,7 +324,7 @@ void InputGenListener::afterRunMethodAsMain() {
 //		printSymbolicNode(head);
 //	}
 
-	std::cerr << "input generate calling start.\n";
+//	std::cerr << "input generate calling start.\n";
 	inputGen(InputGenListener::DFS);
 	if (rdManager->symbolicInputPrefix.size() == 0) {
 		executor->setIsFinished();

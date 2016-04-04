@@ -494,7 +494,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 						ref<Expr> exprValue = os->read(offset, sizeof(int) * 8);
 						if (ConstantExpr *ce = dyn_cast<ConstantExpr>(exprValue)) {
 							unsigned intValue = ce->getZExtValue();
-							std::cerr << "int value : " << intValue << std::endl;
+//							std::cerr << "int value : " << intValue << std::endl;
 							rdManager->intArgv.insert(make_pair(varName, intValue));
 						} else {
 							assert(0 && "the value in int argv is not a integer value(if).\n");
@@ -970,7 +970,7 @@ void PSOListener::afterRunMethodAsMain() {
 		}
 		rdManager->runState = 0;
 	} else {
-		std::cerr << "PSOListener after run function as main.\n";
+//		std::cerr << "PSOListener after run function as main.\n";
 		rdManager->runState = 1;
 		std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
 		std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;

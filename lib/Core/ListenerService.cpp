@@ -214,7 +214,7 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 	}
 	rdManager.pArgv = argv;
 	rdManager.iArgc = argc;
-	std::cerr << "argc = " << argc << endl;
+//	std::cerr << "argc = " << argc << endl;
 }
 
 void ListenerService::markBrOpGloabl(Executor *executor) {
