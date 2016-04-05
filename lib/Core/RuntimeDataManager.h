@@ -69,6 +69,8 @@ public:
 	void printAllPrefix(std::ostream &out);
 	void printAllTrace(std::ostream &out);
 	int getPrefixSetSize();
+
+	void printCurrPrefix(Prefix *prefix, std::ostream &out);
 };
 
 }

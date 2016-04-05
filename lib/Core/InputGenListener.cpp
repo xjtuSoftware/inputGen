@@ -62,6 +62,8 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 					concreteValue = ConstantExpr::create(false, width);
 				}
 				executor->evalAgainst(ki, 0, thread, concreteValue);
+			} else {
+				break;
 			}
 
 			std::string bbName = inst->getParent()->getName().str();
@@ -218,12 +220,14 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 					if (concreteValue->getKind() != Expr::Constant) {
 						assert(0 && "strlen return value is not a constant.\n");
 					}
+					/*
 					if (ConstantExpr* ce = dyn_cast<ConstantExpr>(concreteValue)) {
 						unsigned value = ce->getZExtValue();
 						std::cerr << "the value of strlen is " << value << std::endl;
 					}
-				} else if (f->getName() == "implAtoI"){
-//					std::cerr << "implAtoI : " << inst->getNumOperands() << std::endl;
+					*/
+				} else if (f->getName() == "makeInput"){
+//					std::cerr << "makeInput : " << inst->getNumOperands() << std::endl;
 					unsigned numArgs = inst->getNumOperands();
 					for (unsigned i = 0; i < (numArgs - 1); i++) {
 						std::string varName = inst->getOperand(i)->getName().str();
@@ -832,6 +836,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		getPrefixFromPath(vecEvent, node->currEvent);
 		Prefix* prefix = new Prefix(vecEvent,
 				rdManager->getCurrentTrace()->createThreadPoint, "mapOfInputAndPreix");
+		rdManager->printCurrPrefix(prefix, std::cerr);
 		std::map<std::string, unsigned> tempMap;
 		tempMap.insert(rdManager->intArgv.begin(), rdManager->intArgv.end());
 		rdManager->symbolicInputPrefix.insert(make_pair(prefix, argvValue));

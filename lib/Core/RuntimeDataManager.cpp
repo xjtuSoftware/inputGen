@@ -142,6 +142,10 @@ bool RuntimeDataManager::isCurrentTraceUntested() {
 	return result;
 }
 
+void RuntimeDataManager::printCurrPrefix(Prefix *prefix, ostream &out) {
+	prefix->print(out);
+}
+
 void RuntimeDataManager::printAllPrefix(ostream &out) {
 	out << "num of prefix: " << scheduleSet.size() << endl;
 	unsigned num = 1;

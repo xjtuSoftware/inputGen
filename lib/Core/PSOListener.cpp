@@ -476,7 +476,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		} else if (kmodule->kleeFunctions.find(f)
 				!= kmodule->kleeFunctions.end()) {
 			item->eventType = Event::IGNORE;
-		} else if (f->getName().str() == "implAtoI") {
+		} else if (f->getName().str() == "makeInput") {
 			if (executor->executionNum == 1) {
 				//insert to the map of intArgv.
 				unsigned argsNum = inst->getNumOperands();
@@ -485,7 +485,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 //					std::cerr << " execution num address : " << address->getWidth() << std::endl;
 					std::string varName = inst->getOperand(i)->getName().str();
 					Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
-//					std::cerr << "implAtoI width = " << width << std::endl;
+//					std::cerr << "makeInput width = " << width << std::endl;
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, address);
 					if (success) {
@@ -1144,10 +1144,11 @@ void PSOListener::handleInitializer(Constant* initializer, MemoryObject* mo,
 			Constant* element = carray->getAggregateElement(i);
 			handleInitializer(element, mo, startAddress);
 		}
-	} else if (UndefValue * uv = dyn_cast<UndefValue>(initializer)) {
+	}/* else if (UndefValue * uv = dyn_cast<UndefValue>(initializer)) {
 		//undefined value is unspecified, so it has not initializer.
 		//just execute running.
-	}else {
+	} */
+	else {
 		initializer->dump();
 		cerr << "value = " << initializer->getValueID() << " type = "
 				<< initializer->getType()->getTypeID() << endl;

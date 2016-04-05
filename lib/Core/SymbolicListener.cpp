@@ -301,7 +301,7 @@ void SymbolicListener::executeInstruction(ExecutionState &state, KInstruction *k
 				}
 			}
 			Function* f = (*currentEvent)->calledFunction;
-			if (f->getName() == "implAtoI") {
+			if (f->getName() == "makeInput") {
 				//change the value of int argvs in on the running on three listener.
 				unsigned argsNum = inst->getNumOperands();
 				for (unsigned i = 0; i < (argsNum - 1); i++) {

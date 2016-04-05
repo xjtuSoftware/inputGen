@@ -323,6 +323,7 @@ void Encode::check_if() {
 //			buildAllFormula();
 
 			Event* curr = ifFormula[i].first;
+			std::cerr << curr->toString() << endl;
 
 //			//添加读写的解
 //			std::set<std::string> &RelatedSymbolicExpr = trace->RelatedSymbolicExpr;
@@ -1256,9 +1257,15 @@ void Encode::preprocessWithIfFormula() {
 		// get if related with while out
 		Event *curr = ifFormula[i].first;
 //		curr->inst->inst->dump();
-		assert(curr->isConditionIns);
+		if (curr->inst->inst->getOpcode() ==
+				Instruction::GetElementPtr || curr->inst->inst->getOpcode() ==
+						Instruction::Switch)
+			continue;
+//		assert(curr->isConditionIns);
+//		std::cerr << curr->toString() << endl;
 		BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 		// operand 1 if.thenxxx
+//		bi->dump();
 		std::string brName = bi->getOperand(2)->getName().str();
 		if (strncmp(brName.c_str(), "if.", 3) != 0) {
 			continue;
@@ -1287,6 +1294,8 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 		if (curr->condition) {
 			if (curr->inst->falseBT == klee::KInstruction::possible) {
 				// negate this branch unconditional.
+				std::cerr << "as for possible negate:" << endl;
+				std::cerr << curr->toString() << endl;
 				negateSpecificBr(pureIfFormula[i]);
 			}
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
@@ -1298,6 +1307,8 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 			}
 		} else {
 			if (curr->inst->trueBT == klee::KInstruction::possible) {
+				std::cerr << "as for possible negate:" << endl;
+				std::cerr << curr->toString() << endl;
 				negateSpecificBr(pureIfFormula[i]);
 			}
 			if (curr->inst->trueBT == klee::KInstruction::definite) {

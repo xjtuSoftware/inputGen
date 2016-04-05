@@ -3073,8 +3073,10 @@ void Executor::run(ExecutionState &initialState) {
 			//cerr << "prefix: " << prefix->getCurrentInst() << " " << prefix->getCurrentInst()->inst->getOpcodeName() << " reality: " << ki << " " << ki->inst->getOpcodeName() << endl;
 			cerr << "thread id : " << thread->threadId << "\n";
 			ki->inst->print(errs());
+					cerr << " " << ki->info->file << " " << ki->info->line;
 			cerr << endl;
 			prefix->getCurrentInst()->inst->print(errs());
+					cerr << " " << ki->info->file << " " << ki->info->line;
 			cerr << endl;
 			cerr << "prefix unmatched\n";
 			execStatus = IGNOREDERROR;
@@ -4567,7 +4569,7 @@ void Executor::createSpecialElement(ExecutionState& state, Type* type,
 		//内存对齐，这里计算结构体的内存对齐只是因为mutex，cond，barrier三种类型不会被解析，因此需要提前计算。
 		DataLayout* layout = kmodule->targetData;
 		//检查是否是opaque结构体，如果是跳过不做处理
-		type->dump();
+//		type->dump();
 		StructType * tmpStructType = dyn_cast<StructType>(type);
 		if (!tmpStructType->isOpaque() && tmpStructType->hasName()) {
 			unsigned alignment = layout->getABITypeAlignment(type);
