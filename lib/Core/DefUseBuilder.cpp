@@ -25,8 +25,6 @@ namespace klee {
 
 DefUseBuilder::DefUseBuilder(RuntimeDataManager& data_t, Encode& encode_t, Executor* executor_t) :
 		rdManager(data_t), encode(encode_t), executor(executor_t) {
-//	encode.z3_ctx = encode.getContext();
-//	z3_solver = encode.getSlover();
 	trace = data_t.getCurrentTrace();
 	currentEvent = NULL;
 }
@@ -239,13 +237,22 @@ void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
 }
 
 bool DefUseBuilder::isCoveredPrePath(DefUse* defUse){
-//	std::vector<DefUse*>::iterator duIte = rdManager.coveredDefUse_pre.begin();
-//	std::vector<DefUse*>::iterator duEndIte = rdManager.coveredDefUse_pre.end();
 	std::vector<DefUse*>::iterator duIte = executor->coveredDefUse_pre.begin();
 	std::vector<DefUse*>::iterator duEndIte = executor->coveredDefUse_pre.end();;
 	while(duIte != duEndIte){
-		if((*duIte)->pre == defUse->pre && (*duIte)->post == defUse->post)
-			return true;
+		if(defUse->pre == NULL){
+			if((*duIte)->pre == NULL)
+				if((*duIte)->post->inst->info->assemblyLine
+						== defUse->post->inst->info->assemblyLine)
+					return true;
+		} else{
+			if((*duIte)->pre != NULL)
+				if((*duIte)->pre->inst->info->assemblyLine
+						== defUse->pre->inst->info->assemblyLine
+						&& (*duIte)->post->inst->info->assemblyLine
+						== defUse->post->inst->info->assemblyLine)
+					return true;
+		}
 		++duIte;
 	}
 	return false;
