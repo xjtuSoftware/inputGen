@@ -354,6 +354,22 @@ Executor::~Executor() {
 		timers.pop_back();
 	}
 
+
+	/* added : Apr 5, 2016
+	 * Author: hhfan
+	 */
+	//free memory space
+	std::vector<DefUse*>::iterator duIte = coveredDefUse_pre.begin();
+	std::cout << "delete *duIte" << std::endl;
+	while(duIte != coveredDefUse_pre.end()){
+		delete *duIte;
+		*duIte = NULL;
+		duIte++;
+	}
+	coveredDefUse_pre.clear();
+	std::vector<DefUse*>().swap(coveredDefUse_pre);
+	std::cout << "delete *duIte over" << coveredDefUse_pre.capacity() << std::endl;
+
 //  vector<ExecutionState*> sortedList(allThread.size() + 1);
 //  for (set<ExecutionState*>::iterator ti = allThread.begin(), te = allThread.end(); ti != te; ti++) {
 //	  if (*ti) {

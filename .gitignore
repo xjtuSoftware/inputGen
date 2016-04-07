@@ -31,6 +31,7 @@
 *.ll
 *.dir
 *.bca
+.cproject
 
 # Specific files
 gen-random-bout
