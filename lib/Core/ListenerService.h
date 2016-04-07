@@ -13,6 +13,7 @@
 #include "klee/ExecutionState.h"
 #include "BitcodeListener.h"
 #include "RuntimeDataManager.h"
+#include "DefUseBuilder.h"
 
 namespace klee {
 

@@ -104,6 +104,8 @@ class Executor: public Interpreter {
 	friend class SymbolicListener;
 	friend class InputGenListener;
 	friend class CondManager;
+	friend class DefUseBuilder;
+
 
 public:
 	class Timer {
@@ -588,6 +590,13 @@ public:
 	void setIsFinished() {
 		isFinished = true;
 	}
+
+	/*added : Apr 5, 2016
+	 *Author: hhfan
+	 */
+private:
+	std::vector<DefUse*> coveredDefUse_pre;		//def-use(s) has been covered in previous paths.
+
 };
 
 } // End klee namespace

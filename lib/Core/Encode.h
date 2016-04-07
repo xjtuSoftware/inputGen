@@ -26,15 +26,19 @@ using namespace std;
 namespace klee {
 
 class Encode {
+	friend class DefUseBuilder;
 private:
 	RuntimeDataManager* runtimeData;
 	Trace* trace; //all data about encoding
-	context z3_ctx;
-	solver z3_solver;
 	DealWithSymbolicExpr filter;
+
 	unsigned formulaNum;
 	unsigned solvingTimes;
 	Event* branchPoint;
+
+public:
+	context z3_ctx;
+	solver z3_solver;
 
 public:
 	Encode(RuntimeDataManager* data) :
@@ -117,7 +121,6 @@ private:
 	void logStatisticInfo();
 
 	void controlGranularity(int level);
-
 
 };
 

@@ -12,6 +12,7 @@
 
 #include "klee/Config/Version.h"
 #include "llvm/Support/DataTypes.h"
+#include "InstructionInfoTable.h"
 #include <vector>
 
 namespace llvm {

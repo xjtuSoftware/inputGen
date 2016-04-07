@@ -30,3 +30,10 @@
 *.bc
 *.ll
 *.dir
+*.bca
+
+# Specific files
+gen-random-bout
+kleaver
+klee
+config.log

@@ -323,7 +323,8 @@ void Encode::check_if() {
 //			buildAllFormula();
 
 			Event* curr = ifFormula[i].first;
-			std::cerr << curr->toString() << endl;
+
+//			std::cerr << curr->toString() << endl;
 
 //			//添加读写的解
 //			std::set<std::string> &RelatedSymbolicExpr = trace->RelatedSymbolicExpr;
@@ -1294,8 +1295,8 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 		if (curr->condition) {
 			if (curr->inst->falseBT == klee::KInstruction::possible) {
 				// negate this branch unconditional.
-				std::cerr << "as for possible negate:" << endl;
-				std::cerr << curr->toString() << endl;
+//				std::cerr << "as for possible negate:" << endl;
+//				std::cerr << curr->toString() << endl;
 				negateSpecificBr(pureIfFormula[i]);
 			}
 			if (curr->inst->falseBT == klee::KInstruction::definite) {
@@ -1307,8 +1308,8 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 			}
 		} else {
 			if (curr->inst->trueBT == klee::KInstruction::possible) {
-				std::cerr << "as for possible negate:" << endl;
-				std::cerr << curr->toString() << endl;
+//				std::cerr << "as for possible negate:" << endl;
+//				std::cerr << curr->toString() << endl;
 				negateSpecificBr(pureIfFormula[i]);
 			}
 			if (curr->inst->trueBT == klee::KInstruction::definite) {

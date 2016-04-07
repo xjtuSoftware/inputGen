@@ -147,6 +147,9 @@ void ListenerService::endControl(Executor* executor){
 //		markBrOpGloabl(executor);
 		Encode encode(&rdManager);
 		encode.buildifAndassert();
+
+		DefUseBuilder duBuilder(rdManager, encode, executor);
+		duBuilder.buildAllDefUse();
 //		encode.getPrefixForDefUse();
 		encode.getPrefixFromMP();
 		/***

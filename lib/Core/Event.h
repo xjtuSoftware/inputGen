@@ -86,6 +86,11 @@ public:
 	std::map<std::string, llvm::Constant*> scrVariables; // function's input variable
 
 
+	/*added : Apr 5, 2016
+	 *Author: hhfan
+	 */
+	Event * latestRead; //the latest write event in the same thread
+
 
 	Event();
 	Event(unsigned threadId, unsigned eventId, std::string eventName,

@@ -3073,10 +3073,8 @@ void Executor::run(ExecutionState &initialState) {
 			//cerr << "prefix: " << prefix->getCurrentInst() << " " << prefix->getCurrentInst()->inst->getOpcodeName() << " reality: " << ki << " " << ki->inst->getOpcodeName() << endl;
 			cerr << "thread id : " << thread->threadId << "\n";
 			ki->inst->print(errs());
-					cerr << " " << ki->info->file << " " << ki->info->line;
 			cerr << endl;
 			prefix->getCurrentInst()->inst->print(errs());
-					cerr << " " << ki->info->file << " " << ki->info->line;
 			cerr << endl;
 			cerr << "prefix unmatched\n";
 			execStatus = IGNOREDERROR;
