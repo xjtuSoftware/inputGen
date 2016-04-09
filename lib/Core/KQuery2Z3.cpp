@@ -199,8 +199,14 @@ z3::expr KQuery2Z3::eachExprToZ3(ref<Expr> &ele) {
 			re = cast<ReadExpr>(ce->getKid(0));
 		else if (ce->getKid(1)->getKind() == Expr::Read)
 			re = cast<ReadExpr>(ce->getKid(1));
-		else
+		else if (ce->getKid(1)->getKind() == Expr::Concat){
+			while (ce->getKid(1)->getKind() == Expr::Concat) {
+				ce = cast<ConcatExpr>(ce->getKid(1));
+			}
+			re = cast<ReadExpr>(ce->getKid(1));
+		} else {
 			assert("file: kQuery2z3, Expr::Concat" && false);
+		}
 		const std::string varName = re->updates.root->name;
 		if (re->updates.root->isFloat) {  //float point symbolics
 //				std::cerr << "build float " << varName << std::endl;

@@ -31,7 +31,6 @@ class DefUseBuilder {
 private:
 	RuntimeDataManager& rdManager;
 	Encode& encode;
-	Executor* executor;
 	Trace* trace; //all data about encoding
 	map<string, Event*> latestWriteOneThread;
 	map<string, Event*> latestReadOneThread;
@@ -40,7 +39,7 @@ private:
 	Event* currentEvent;
 
 public:
-	DefUseBuilder(RuntimeDataManager& data_t, Encode& encode_t, Executor* executor_t);
+	DefUseBuilder(RuntimeDataManager& data_t, Encode& encode_t);
 	virtual ~DefUseBuilder();
 
 private:

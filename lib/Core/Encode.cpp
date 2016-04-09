@@ -1609,7 +1609,7 @@ void Encode::handlePossibleGVar() {
 void Encode::negateSpecificBr(std::pair<Event*, expr>& specificPair) {
 	// negate this branch get the corresponding prefix.
 
-	std::cerr << "negate specific branch." << endl;
+//	std::cerr << "negate specific branch." << endl;
 	unsigned ifSize = ifFormula.size();
 	std::vector<std::string> vecArgvs;
 	int tt = 1;
@@ -1659,7 +1659,7 @@ void Encode::negateSpecificBr(std::pair<Event*, expr>& specificPair) {
 		runtimeData->symbolicInputPrefix.insert(make_pair(prefix, vecArgvs));
 		runtimeData->intInputPrefix.insert(make_pair(prefix, runtimeData->intArgv));
 	} else {
-		std::cerr << "can not negate this branch" << std::endl;
+//		std::cerr << "can not negate this branch" << std::endl;
 	}
 
 	z3_solver.pop();

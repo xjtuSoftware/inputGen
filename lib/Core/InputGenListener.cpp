@@ -226,8 +226,8 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 						std::cerr << "the value of strlen is " << value << std::endl;
 					}
 					*/
-				} else if (f->getName() == "makeInput"){
-//					std::cerr << "makeInput : " << inst->getNumOperands() << std::endl;
+				} else if (f->getName() == "make_input"){
+//					std::cerr << "make_input : " << inst->getNumOperands() << std::endl;
 					unsigned numArgs = inst->getNumOperands();
 					for (unsigned i = 0; i < (numArgs - 1); i++) {
 						std::string varName = inst->getOperand(i)->getName().str();
@@ -235,7 +235,7 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 						Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
 
 						//8 bits. the problems in here. 坑
-						ref<Expr> retSym = manualMakeSymbolic(state, varName, sizeof(int) * 8/*define as char*/, false);
+						ref<Expr> retSym = manualMakeSymbolic(state, varName, sizeof(int) * 8, false);
 						ObjectPair op;
 						bool success = executor->getMemoryObject(op, state, address);
 						if (success) {
@@ -836,16 +836,16 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 		getPrefixFromPath(vecEvent, node->currEvent);
 		Prefix* prefix = new Prefix(vecEvent,
 				rdManager->getCurrentTrace()->createThreadPoint, "mapOfInputAndPreix");
-		rdManager->printCurrPrefix(prefix, std::cerr);
+//		rdManager->printCurrPrefix(prefix, std::cerr);
 		std::map<std::string, unsigned> tempMap;
 		tempMap.insert(rdManager->intArgv.begin(), rdManager->intArgv.end());
 		rdManager->symbolicInputPrefix.insert(make_pair(prefix, argvValue));
 //		std::cerr << "argv value size = " << argvValue.size() << endl;
 		rdManager->intInputPrefix.insert(make_pair(prefix, tempMap));
 	} else if (result == z3::unsat) {
-		std::cerr << "unsat inputGenListener.\n";
+//		std::cerr << "unsat inputGenListener.\n";
 	} else {
-		std::cerr << "unknown inputGenListener.\n";
+//		std::cerr << "unknown inputGenListener.\n";
 	}
 	z3_solver.pop();
 	delete kq;

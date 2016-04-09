@@ -148,7 +148,7 @@ void ListenerService::endControl(Executor* executor){
 		Encode encode(&rdManager);
 		encode.buildifAndassert();
 
-		DefUseBuilder duBuilder(rdManager, encode, executor);
+		DefUseBuilder duBuilder(rdManager, encode);
 		duBuilder.buildAllDefUse();
 //		encode.getPrefixForDefUse();
 		encode.getPrefixFromMP();
@@ -172,6 +172,11 @@ void ListenerService::endControl(Executor* executor){
 //		executor->isFinished = true;
 		executor->inputGen = false;
 		executor->argvSymbolics.clear();
+
+		gettimeofday(&finish, NULL);
+		double cost = (double) (finish.tv_sec * 1000000UL + finish.tv_usec
+				- start.tv_sec * 1000000UL - start.tv_usec) / 1000000UL;
+		rdManager.inputCost += cost;
 		break;
 	}
 	default: {
@@ -238,7 +243,7 @@ void ListenerService::markBrOpGloabl(Executor *executor) {
 					if (rdManager.bbOpGlobal.find((llvm::BasicBlock*)(opit->get())) !=
 							rdManager.bbOpGlobal.end()) {
 						ki->operateGlobalVar = true;
-						std::cerr << "operate global variables" << std::endl;
+//						std::cerr << "operate global variables" << std::endl;
 						ki->inst->dump();
 					}
 				}
@@ -257,7 +262,6 @@ std::string ListenerService::getBlockFullName(llvm::BranchInst *bi, bool brCond)
 		blockName = bi->getOperand(1)->getName().str();
 
 	std::string funcName = bi->getParent()->getParent()->getName().str();
-
 	ret = funcName + "." + blockName;
 
 	return ret;
@@ -342,26 +346,31 @@ ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 		} else if (bit->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(bit);
 			unsigned argvs = ci->getNumArgOperands();
-
-			for (unsigned i = 0; i < argvs; i++) {
-				if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
-					return klee::KInstruction::possible;
-				}
-			}
-
 			Function* func = ci->getCalledFunction();
-			std::set<std::string> funcNameSet;
-
-			if (!func->isDeclaration()) {
-				std::set<std::string> opGVar;
-				klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
-				if (temp == klee::KInstruction::possible) {
-					ret = klee::KInstruction::possible;
-					break;
+			if (func->getName().str() == "printf" ||
+					func->getName().str() == "sprintf" ||
+					func->getName().str() == "fprintf") {
+				;
+			} else {
+				for (unsigned i = 0; i < argvs; i++) {
+					if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
+						return klee::KInstruction::possible;
+					}
 				}
-				if (temp == klee::KInstruction::definite) {
-					ret = temp;
-					gVarNames.insert(opGVar.begin(), opGVar.end());
+
+				std::set<std::string> funcNameSet;
+
+				if (!func->isDeclaration()) {
+					std::set<std::string> opGVar;
+					klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
+					if (temp == klee::KInstruction::possible) {
+						ret = klee::KInstruction::possible;
+						break;
+					}
+					if (temp == klee::KInstruction::definite) {
+						ret = temp;
+						gVarNames.insert(opGVar.begin(), opGVar.end());
+					}
 				}
 			}
 		}
@@ -394,7 +403,6 @@ void ListenerService::preparation(Executor *executor) {
 			std::cerr << "var name : " << varName << std::endl;
 		}
 	}
-
 	for (std::vector<KFunction*>::iterator it = executor->kmodule->functions.begin(),
 			ie = executor->kmodule->functions.end(); it != ie; it++) {
 //		std::cerr << "entry block name : " << (*it)->function->getName().str() << endl;
@@ -714,14 +722,20 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 		}*/ else if (bit->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(bit);
 			unsigned argvs = ci->getNumArgOperands();
+			Function* func = ci->getCalledFunction();
 
+			if (func->getName().str() == "printf" ||
+					func->getName().str() == "sprintf" ||
+					func->getName().str() == "fprintf") {
+				continue;
+			}
 			for (unsigned i = 0; i < argvs; i++) {
 				if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
 					return klee::KInstruction::possible;
 				}
 			}
 
-			Function* func = ci->getCalledFunction();
+
 			std::set<std::string> funcNameSet;
 
 			if (!func->isDeclaration()) {

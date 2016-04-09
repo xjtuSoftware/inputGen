@@ -476,7 +476,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 		} else if (kmodule->kleeFunctions.find(f)
 				!= kmodule->kleeFunctions.end()) {
 			item->eventType = Event::IGNORE;
-		} else if (f->getName().str() == "makeInput") {
+		} else if (f->getName().str() == "make_input") {
 			if (executor->executionNum == 1) {
 				//insert to the map of intArgv.
 				unsigned argsNum = inst->getNumOperands();
@@ -485,7 +485,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 //					std::cerr << " execution num address : " << address->getWidth() << std::endl;
 					std::string varName = inst->getOperand(i)->getName().str();
 					Expr::Width width = executor->getWidthForLLVMType(inst->getOperand(i)->getType());
-//					std::cerr << "makeInput width = " << width << std::endl;
+//					std::cerr << "make_input width = " << width << std::endl;
 					ObjectPair op;
 					bool success = executor->getMemoryObject(op, state, address);
 					if (success) {

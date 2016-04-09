@@ -23,8 +23,8 @@ using namespace z3;
 #define PRINT_DEF_USE 0
 namespace klee {
 
-DefUseBuilder::DefUseBuilder(RuntimeDataManager& data_t, Encode& encode_t, Executor* executor_t) :
-		rdManager(data_t), encode(encode_t), executor(executor_t) {
+DefUseBuilder::DefUseBuilder(RuntimeDataManager& data_t, Encode& encode_t) :
+		rdManager(data_t), encode(encode_t) {
 	trace = data_t.getCurrentTrace();
 	currentEvent = NULL;
 }
@@ -34,7 +34,7 @@ DefUseBuilder::~DefUseBuilder() {
 }
 
 void DefUseBuilder::buildAllDefUse(){
-	std::cout << "build all def-use" << std::endl;
+//	std::cout << "build all def-use" << std::endl;
 	std::cout << "<-->--<-->--<-->--<--><-->--<--><-->--<--><-->--<-->" << std::endl;
 	buildDefUseForCurPath();
 }
@@ -44,7 +44,7 @@ void DefUseBuilder::buildAllDefUse(){
  * so, we have to get the latestWrite of curRead in current path. Then reduce it.
  */
 Event* DefUseBuilder::getLatestWriteInCurPath(Event* curRead, map<string, vector<Event *> >::iterator wsIte){
-	std::cout << "reduce marked type->1" << std::endl;
+//	std::cout << "reduce marked type->1" << std::endl;
 	Event* latestWrite = NULL;
 	unsigned maxEventId = 0;
 	for(unsigned i = 0; i < wsIte->second.size(); ++i){
@@ -59,7 +59,7 @@ Event* DefUseBuilder::getLatestWriteInCurPath(Event* curRead, map<string, vector
 /*
  * just consider shared memory access points.
  *
- * we have to reduce def-use in the follwoing two situation:
+ * we have to reduce def-use in the following two situation:
  * (1)when curRead->latestWrite == curWrite, it's sure that the new def-use has been covered by current path.
  * 	  so, we reduce this kind of def-use in function buildDefUseForCurPath(don't construct such def-use).
  *
@@ -145,12 +145,12 @@ void DefUseBuilder::buildDefUseForCurPath() {
 					curWrite = wsIte->second[l];
 					if (curRead->threadId == curWrite->threadId && curRead->latestWrite != curWrite)  //can't read
 					{
-						std::cout << "marked for test!" << std::endl;
+//						std::cout << "marked for test!" << std::endl;
 						continue;
 					}
 					//reduce def-use chain which has been covered by current path.
 					if(curWrite == curRead->latestWrite){
-						std::cout << "reduce marked type->2" << std::endl;
+//						std::cout << "reduce marked type->2" << std::endl;
 						buildDefUse(curRead, curWrite, wsIte);
 						continue;
 					}
@@ -171,13 +171,13 @@ void DefUseBuilder::buildAndVerifyDefUse(Event* curRead, Event* curWrite,
 	def_use->pre = curWrite;
 	def_use->post = curRead;
 	if(!isCoveredPrePath(def_use)){
-		executor->coveredDefUse_pre.push_back(def_use);
+		rdManager.coveredDefUse_pre.push_back(def_use);
 		expr defUseExpr = encode.z3_ctx.int_const("E_INIT");
 		buildExpr(curRead, curWrite, iw, defUseExpr);
 		if(isValid(defUseExpr))
 			std::cout << "the constraint can be solved!" << std::endl;
-		else
-			std::cout << "the constraint can not be solved!" << std::endl;
+		else ;
+//			std::cout << "the constraint can not be solved!" << std::endl;
 	}
 }
 
@@ -187,8 +187,8 @@ void DefUseBuilder::buildDefUse(Event* curRead, Event* curWrite,
 	def_use->pre = curWrite;
 	def_use->post = curRead;
 	if(!isCoveredPrePath(def_use)){
-		executor->coveredDefUse_pre.push_back(def_use);
-		std::cout << "just build" << std::endl;
+		rdManager.coveredDefUse_pre.push_back(def_use);
+//		std::cout << "just build" << std::endl;
 	}
 
 }
@@ -237,8 +237,8 @@ void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
 }
 
 bool DefUseBuilder::isCoveredPrePath(DefUse* defUse){
-	std::vector<DefUse*>::iterator duIte = executor->coveredDefUse_pre.begin();
-	std::vector<DefUse*>::iterator duEndIte = executor->coveredDefUse_pre.end();;
+	std::vector<DefUse*>::iterator duIte = rdManager.coveredDefUse_pre.begin();
+	std::vector<DefUse*>::iterator duEndIte = rdManager.coveredDefUse_pre.end();;
 	while(duIte != duEndIte){
 		if(defUse->pre == NULL){
 			if((*duIte)->pre == NULL)
@@ -260,13 +260,13 @@ bool DefUseBuilder::isCoveredPrePath(DefUse* defUse){
 
 
 bool DefUseBuilder::isValid(const expr& defUseExpr){
-	std::cout << defUseExpr << std::endl;
 
 	encode.z3_solver.push();
 	encode.z3_solver.add(defUseExpr);
 
 	try {
 		if(z3::sat == encode.z3_solver.check()){
+			std::cout << defUseExpr << std::endl;
 			encode.z3_solver.pop();
 			return true;
 		}
@@ -520,13 +520,13 @@ void DefUseBuilder::printSingleThreadEvent(){
 		if(iw == trace->writeSet.end())
 			continue;
 
-		std::cout << "print single thread event!" << (*imb).first << std::endl;
+//		std::cout << "print single thread event!" << (*imb).first << std::endl;
 
 		unsigned threadIdTmp = (*(*imb).second[0]).threadId;
 		std::vector<Event*>::iterator ivb_r, ive_r;
 		for(ivb_r = (*imb).second.begin(),
 				ive_r = (*imb).second.end(); ivb_r != ive_r; ++ivb_r){
-			std::cout <<"Read set: " << (*ivb_r)->threadId << " -> " << (*ivb_r)->eventName << std::endl;
+//			std::cout <<"Read set: " << (*ivb_r)->threadId << " -> " << (*ivb_r)->eventName << std::endl;
 			if(threadIdTmp != (*ivb_r)->threadId)
 				break;
 		}
@@ -537,7 +537,7 @@ void DefUseBuilder::printSingleThreadEvent(){
 		std::vector<Event*>::iterator ivb_w, ive_w;
 		for(ivb_w = (*iw).second.begin(),
 				ive_w = (*iw).second.end(); ivb_w != ive_w; ++ivb_w){
-			std::cout <<"Write set: " << (*ivb_w)->threadId << " -> " << (*ivb_w)->eventName << std::endl;
+//			std::cout <<"Write set: " << (*ivb_w)->threadId << " -> " << (*ivb_w)->eventName << std::endl;
 			if(threadIdTmp != (*ivb_w)->threadId)
 				break;
 		}
@@ -545,7 +545,7 @@ void DefUseBuilder::printSingleThreadEvent(){
 		if(ivb_w != ive_w)
 			continue;
 
-		std::cout << "marked!" << (*imb).first << std::endl;
+//		std::cout << "marked!" << (*imb).first << std::endl;
 		singleThreadEvent.push_back((*imb).first);
 	}
 

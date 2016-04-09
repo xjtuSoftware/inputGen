@@ -591,12 +591,6 @@ public:
 		isFinished = true;
 	}
 
-	/*added : Apr 5, 2016
-	 *Author: hhfan
-	 */
-private:
-	std::vector<DefUse*> coveredDefUse_pre;		//def-use(s) has been covered in previous paths.
-
 };
 
 } // End klee namespace

@@ -31,12 +31,13 @@ private:
 	//first: main input, second: prefix executed to negated branch.
 
 
-//	/*added : Apr 5, 2016
-//	 *Author: hhfan
-//	 *Detail: Define-Use Chain Set.
-//	 */
-//public:
-//	std::vector<DefUse*> coveredDefUse_pre;		//def-use(s) has been covered in previous paths.
+	/*added : Apr 5, 2016
+	 *Author: hhfan
+	 *Detail: Define-Use Chain Set.
+	 */
+public:
+	std::vector<DefUse*> coveredDefUse_pre;		//def-use(s) has been covered in previous paths.
+
 
 public:
 	//newly added stastic info
@@ -49,6 +50,7 @@ public:
 	unsigned uunSatBranch;
 	double runningCost;
 	double solvingCost;
+	double inputCost;
 	double satCost;
 	double unSatCost;
 

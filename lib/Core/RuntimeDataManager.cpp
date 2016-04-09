@@ -34,6 +34,7 @@ RuntimeDataManager::RuntimeDataManager() :
 	uunSatBranch = 0;
 	solvingCost = 0.0;
 	runningCost = 0.0;
+	inputCost = 0.0;
 	satCost = 0.0;
 	unSatCost = 0.0;
 	runState = 0;
@@ -45,6 +46,7 @@ RuntimeDataManager::~RuntimeDataManager() {
 			ti != te; ti++) {
 		delete *ti;
 	}
+
 	string ErrorInfo;
 	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, 0x0202);
 	stringstream ss;
@@ -89,8 +91,25 @@ RuntimeDataManager::~RuntimeDataManager() {
 	}
 	ss << "SolvingCost:" << solvingCost << "\n";
 	ss << "RunningCost:" << runningCost << "\n";
+	ss << "inputCost:" << inputCost << "\n";
+	ss << "def-use size:" << coveredDefUse_pre.size() << "\n";
 	out_to_file << ss.str();
 	out_to_file.close();
+
+	/* added : Apr 5, 2016
+	 * Author: hhfan
+	 */
+	//free memory space
+	std::vector<DefUse*>::iterator duIte = coveredDefUse_pre.begin();
+	while(duIte != coveredDefUse_pre.end()){
+		delete *duIte;
+		*duIte = NULL;
+		duIte++;
+	}
+	coveredDefUse_pre.clear();
+	std::vector<DefUse*>().swap(coveredDefUse_pre);
+
+
 }
 
 Trace* RuntimeDataManager::createNewTrace(unsigned traceId) {

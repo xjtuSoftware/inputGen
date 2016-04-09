@@ -140,7 +140,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
 		add("valloc", handleValloc, true),
 
-		add("makeInput", handleIntInputs, false),
+		add("make_input", handleIntInputs, false),
 #undef addDNR
 #undef add  
 		};
