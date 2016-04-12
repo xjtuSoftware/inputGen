@@ -192,6 +192,7 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 			if (!(*currentEvent)->isFunctionWithSourceCode) {
 				CallSite cs(inst);
 				Function* f = (*currentEvent)->calledFunction;
+				/*
 				if (f->getName() == "atoi") {
 					//get the read result
 					ref<Expr> address = executor->eval(ki, 1, thread).value;
@@ -220,13 +221,14 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 					if (concreteValue->getKind() != Expr::Constant) {
 						assert(0 && "strlen return value is not a constant.\n");
 					}
-					/*
+
 					if (ConstantExpr* ce = dyn_cast<ConstantExpr>(concreteValue)) {
 						unsigned value = ce->getZExtValue();
 						std::cerr << "the value of strlen is " << value << std::endl;
 					}
-					*/
-				} else if (f->getName() == "make_input"){
+
+				} else */
+					if (f->getName() == "make_input"){
 //					std::cerr << "make_input : " << inst->getNumOperands() << std::endl;
 					unsigned numArgs = inst->getNumOperands();
 					for (unsigned i = 0; i < (numArgs - 1); i++) {
@@ -578,7 +580,6 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 			// current branch is a switch statement.
 		} else {
 			Event *curr = temp->currEvent;
-
 			assert(curr->isConditionIns);
 			if (temp->brTrue) {
 				if (curr->inst->falseBT == KInstruction::possible) {
@@ -630,9 +631,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 				if (curr->inst->trueBT == klee::KInstruction::definite) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 					std::string brName = getBlockFullName(bi, true);
-					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					deleteMPFromCurrExe(brName, temp->next);
-					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					tryNegateSecondBr(brName, temp->next);
 				}
 				if (curr->inst->falseBT != klee::KInstruction::none) {
@@ -644,7 +643,6 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 						BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 						std::string brName = getBlockFullName(bi, false);
 
-						std::cerr << "before pass argv id : " << curr->eventId << endl;
 						if (tryNegateFirstBr(brName, temp->next)) {
 							negateThisBranch(temp);
 						}
@@ -654,9 +652,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 				if (curr->inst->falseBT == klee::KInstruction::definite) {
 					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 					std::string brName = getBlockFullName(bi, false);
-					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					deleteMPFromCurrExe(brName, temp->next);
-					std::cerr << "before pass argv id : " << curr->eventId << endl;
 					tryNegateSecondBr(brName, temp->next);
 				}
 				if (curr->inst->trueBT != klee::KInstruction::none) {
@@ -667,7 +663,6 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head) {
 						BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 						std::string brName = getBlockFullName(bi, true);
 
-						std::cerr << "before pass argv id : " << curr->eventId << endl;
 						if (tryNegateFirstBr(brName, temp->next)) {
 							negateThisBranch(temp);
 						}
@@ -848,6 +843,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 //		std::cerr << "unknown inputGenListener.\n";
 	}
 	z3_solver.pop();
+
 	delete kq;
 }
 
@@ -1050,7 +1046,7 @@ void InputGenListener::insertInputPrefix(Encode& encode,
 
 	std::vector<std::string>::iterator vit = argvValue.begin(),
 			vie = argvValue.end();
-	for (; it != ie; it++) {
+	for (; vit != vie; vit++) {
 		std::cerr << "argv is " << (*vit) << std::endl;
 	}
 }

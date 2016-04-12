@@ -316,8 +316,8 @@ void DefUseBuilder::markLatestWriteForGlobalVar() { 		//called by buildReadWrite
 						string curr = event->implicitGlobalVar[i];
 						string varName = curr.substr(0, curr.find('S', 0));
 						latestWriteOneThread[varName] = event;
-						std::cout << "CallInst:" << std::endl;
-						I->dump();
+//						std::cout << "CallInst:" << std::endl;
+//						I->dump();
 					}
 				} else { //read
 					Event* writeEvent;

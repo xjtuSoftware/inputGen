@@ -118,6 +118,7 @@ void ListenerService::startControl(Executor* executor){
 			executor->prefix->reuse();
 		}
 		executor->inputGen = true;
+		gettimeofday(&start, NULL);
 		std::cerr << "InputGenListener execute \n";
 		break;
 	}
@@ -187,25 +188,20 @@ void ListenerService::endControl(Executor* executor){
 }
 
 void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* executor) {
-//	std::cerr << "prefix set size = " << rdManager.getPrefixSetSize() << endl;
 	if (rdManager.runState == 0 && rdManager.symbolicInputPrefix.size() != 0) {
 		std::map<Prefix*, std::vector<std::string> >::iterator it =
 				rdManager.symbolicInputPrefix.begin();
-//		std::cerr << "size of prefix and input : " << rdManager.symbolicInputPrefix.size() << endl;
 		executor->prefix = it->first;
 		int i = 1;
 
 		std::vector<std::string>::size_type cnt = it->second.size();
-//		std::cerr << "cnt = " << cnt << ", argc = " << argc << endl;
-		assert((unsigned long)(argc - 1) == cnt && "the number of computed argv is not equal argc");
+//		assert((unsigned long)(argc - 1) == cnt && "the number of computed argv is not equal argc");
 		unsigned int vecSize = it->second.size();
 		for (unsigned j = 0; j < vecSize; j++) {
 			unsigned t = 0;
-//			std::cerr << "j = " << j << std::endl;
 			for (; t < it->second[j].size(); t++)
 				argv[i][t] = it->second[j][t];
 			argv[i][t] = '\0';
-//			std::cerr << "change argv : " << argv[i] << std::endl;
 			i++;
 		}
 		std::map<Prefix*, std::map<std::string, unsigned> >::iterator mit =
@@ -215,14 +211,10 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 		std::map<std::string, unsigned> tempMap = mit->second;
 		rdManager.intArgv.insert(tempMap.begin(), tempMap.end());
 		rdManager.intInputPrefix.erase(mit->first);
-//		std::cerr << "i = " << i << std::endl;
-//		argv[i][0] = '\0';
-//		std::cerr << "change input prefix i = " << i << std::endl;
 		rdManager.symbolicInputPrefix.erase(it->first);
 	}
 	rdManager.pArgv = argv;
 	rdManager.iArgc = argc;
-//	std::cerr << "argc = " << argc << endl;
 }
 
 void ListenerService::markBrOpGloabl(Executor *executor) {
@@ -308,10 +300,17 @@ ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 
 	bbIt--;
 
-	if (bie->getOpcode() == Instruction::Br) {
-		optiInst = (llvm::Instruction *)bie->getOperand(0);
+
+	llvm::Instruction *lastInst = (llvm::Instruction *)(bbIt);
+	if (lastInst->getOpcode() == Instruction::Br) {
+		llvm::BranchInst *brInst = dyn_cast<BranchInst>(lastInst);
+		if (brInst->isUnconditional()) {
+			optiInst = lastInst;
+		} else {
+			optiInst = (llvm::Instruction *)bbIt->getOperand(0);
+		}
 	} else {
-		optiInst = dyn_cast<Instruction>(bie);
+		optiInst = dyn_cast<Instruction>(bbIt);
 	}
 
 	llvm::Instruction *tempInst = dyn_cast<Instruction>(bit);
@@ -335,6 +334,10 @@ ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 			std::string var1 = bit->getOperand(0)->getName().str();
 			std::string var2 = bit->getOperand(1)->getName().str();
 
+			if (bit->getOperand(0)->getType()->getTypeID() == Type::PointerTyID) {
+				ret =  klee::KInstruction::possible;
+				break;
+			}
 			if (var1 != "" && globalVarNameSet.find(var1) != globalVarNameSet.end()) {
 				gVarNames.insert(var1);
 				ret = klee::KInstruction::definite;
@@ -347,32 +350,35 @@ ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 			CallInst* ci = cast<CallInst>(bit);
 			unsigned argvs = ci->getNumArgOperands();
 			Function* func = ci->getCalledFunction();
-			if (func->getName().str() == "printf" ||
-					func->getName().str() == "sprintf" ||
-					func->getName().str() == "fprintf") {
-				;
-			} else {
-				for (unsigned i = 0; i < argvs; i++) {
-					if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
-						return klee::KInstruction::possible;
+//			std::cerr << "name : " << func->getName().str() << endl;
+//			if (func->isNullValue()) {
+				if (func->getName().str() == "printf" ||
+						func->getName().str() == "sprintf" ||
+						func->getName().str() == "fprintf") {
+					;
+				} else {
+					for (unsigned i = 0; i < argvs; i++) {
+						if (ci->getOperand(i)->getType()->getTypeID() == Type::PointerTyID) {
+							return klee::KInstruction::possible;
+						}
+					}
+
+					std::set<std::string> funcNameSet;
+
+					if (!func->isDeclaration()) {
+						std::set<std::string> opGVar;
+						klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
+						if (temp == klee::KInstruction::possible) {
+							ret = klee::KInstruction::possible;
+							break;
+						}
+						if (temp == klee::KInstruction::definite) {
+							ret = temp;
+							gVarNames.insert(opGVar.begin(), opGVar.end());
+						}
 					}
 				}
-
-				std::set<std::string> funcNameSet;
-
-				if (!func->isDeclaration()) {
-					std::set<std::string> opGVar;
-					klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
-					if (temp == klee::KInstruction::possible) {
-						ret = klee::KInstruction::possible;
-						break;
-					}
-					if (temp == klee::KInstruction::definite) {
-						ret = temp;
-						gVarNames.insert(opGVar.begin(), opGVar.end());
-					}
-				}
-			}
+//			}
 		}
 		bit++;
 		tempInst = dyn_cast<Instruction>(bit);
@@ -412,7 +418,7 @@ void ListenerService::preparation(Executor *executor) {
 		for (unsigned i = 0; i < (*it)->numInstructions; i++) {
 			KInstruction *ki = instructions[i];
 			Instruction *inst = ki->inst;
-
+			std::set<std::string> bbNames;
 			if (inst->getOpcode() == Instruction::Br &&
 					!belongToRuntimeDir(ki->info->file)) {
 				BranchInst *bi = cast<BranchInst>(inst);
@@ -424,7 +430,8 @@ void ListenerService::preparation(Executor *executor) {
 					BasicBlock *uncondBB = bi->getSuccessor(0);
 //					std::cerr << "uncond bb name : " << uncondBB->getName().str() << endl;
 					if (strncmp(uncondBB->getParent()->getName().str().c_str(), "klee", 4) != 0) {
-						KInstruction::BranchType temp  = basicBlockOpGlobal(uncondBB, nameSet);
+						bbNames.clear();
+						KInstruction::BranchType temp  = basicBlockOpGlobal(uncondBB, nameSet, bbNames);
 						if (temp == KInstruction::definite) {
 							std::string mp1Name = uncondBB->getParent()->getName().str() +
 									"." + uncondBB->getName().str();
@@ -463,7 +470,8 @@ void ListenerService::preparation(Executor *executor) {
 //					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 //					std::cerr << "then block name : " << thenName << endl;
 					BasicBlock *bbThen = bi->getSuccessor(0);
-					ki->trueBT = basicBlockOpGlobal(bbThen, thenNames);
+					bbNames.clear();
+					ki->trueBT = basicBlockOpGlobal(bbThen, thenNames, bbNames);
 //					std::set<std::string>::iterator thenIt = thenNames.begin(),
 //							thenIe = thenNames.end();
 ////					for (; thenIt != thenIe; thenIt++) {
@@ -489,7 +497,8 @@ void ListenerService::preparation(Executor *executor) {
 //					std::cerr << "^^^^^^^^^^^^^^^^^^^^^^^^^^" << endl;
 //					std::cerr << "else block name : " << elseName << endl;
 					BasicBlock *bbElse = bi->getSuccessor(1);
-					ki->falseBT = basicBlockOpGlobal(bbElse, elseNames);
+					bbNames.clear();
+					ki->falseBT = basicBlockOpGlobal(bbElse, elseNames, bbNames);
 					std::string fullElse = getBlockFullName(bi, false);
 //					std::set<std::string>::iterator elseIt = elseNames.begin(),
 //							elseIe = elseNames.end();
@@ -670,9 +679,13 @@ void ListenerService::getMatchingPair(Executor *executor) {
 
 
 KInstruction::BranchType
-ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::string> &allGvar) {
+ListenerService::basicBlockOpGlobal(
+		llvm::BasicBlock *basicBlock,
+		std::set<std::string> &allGvar,
+		std::set<std::string> &bbNames) {
 	KInstruction::BranchType ret = KInstruction::none;
-
+	std::string name = basicBlock->getName().str();
+	bbNames.insert(name);
 	for (BasicBlock::iterator bit = basicBlock->begin(), bie = basicBlock->end();
 			bit != bie; bit++) {
 //		bit->dump();
@@ -702,24 +715,77 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 				ret = klee::KInstruction::definite;
 			}
 		}
-		/*
 		else if (bit->getOpcode() == Instruction::Br) {
 				 BranchInst *bi = cast<BranchInst>(bit);
-			if (bi->isUnconditional())
-				continue;
-			klee::KInstruction::BranchType ret1 =
-					basicBlockOpGlobal(bi->getSuccessor(0), allGvar);
-			klee::KInstruction::BranchType ret2 =
-					basicBlockOpGlobal(bi->getSuccessor(1), allGvar);
+			if (bi->isUnconditional()) {
+				std::string succName = bi->getSuccessor(0)->getName().str();
+				std::string dotName;
+				int t = -1;
+				for (unsigned i = 0; i < succName.size(); i++) {
+					if (succName[i] == '.') {
+						t = i;
+					}
+				}
+				if (t != -1) {
+				t++;
+				dotName = succName.substr(t);
+				}
+				if (bbNames.find(succName) != bbNames.end()) {
+						continue;
+				} else {
+					if (t != -1) {
+						if (strncmp(dotName.c_str(), "end", 3) == 0) {
+//								std::cerr << "end1 : " << succName << endl;
+								continue;
+						}
+					}
+				}
 
-			if (ret1 == klee::KInstruction::possible ||
-					ret2 == klee::KInstruction::possible)
-				return klee::KInstruction::possible;
+				klee::KInstruction::BranchType retTemp =
+						basicBlockOpGlobal(bi->getSuccessor(0), allGvar, bbNames);
+				if (retTemp == klee::KInstruction::possible) {
+					return klee::KInstruction::possible;
+				}
+				if (retTemp == klee::KInstruction::definite)
+					ret = klee::KInstruction::definite;
 
-			if (ret1 == klee::KInstruction::definite ||
-					ret2 == klee::KInstruction::definite)
-				ret = klee::KInstruction::definite;
-		}*/ else if (bit->getOpcode() == Instruction::Call) {
+			} else {
+				std::string name1 = bi->getSuccessor(0)->getName().str();
+				std::string name2 = bi->getSuccessor(1)->getName().str();
+				std::string dotName;
+				int t = -1;
+				for (unsigned i = 0; i < name2.size(); i++) {
+					if (name2[i] == '.') {
+						t = i;
+					}
+				}
+				if (t != -1) {
+				t++;
+					dotName = name2.substr(t);
+				}
+				klee::KInstruction::BranchType ret1 = klee::KInstruction::none;
+				if (bbNames.find(name1) == bbNames.end())
+					ret1 = basicBlockOpGlobal(bi->getSuccessor(0), allGvar, bbNames);
+				klee::KInstruction::BranchType ret2 = klee::KInstruction::none;
+				if (bbNames.find(name2) == bbNames.end()) {
+					if (t != -1) {
+						if (!(strncmp(dotName.c_str(), "end", 3) == 0)) {
+//							std::cerr << "end2 : " << name2 << ", dotName : " << dotName << endl;
+							ret2 = basicBlockOpGlobal(bi->getSuccessor(1), allGvar, bbNames);
+						}
+					}
+				}
+
+				if (ret1 == klee::KInstruction::possible ||
+						ret2 == klee::KInstruction::possible) {
+					return klee::KInstruction::possible;
+				}
+
+				if (ret1 == klee::KInstruction::definite ||
+						ret2 == klee::KInstruction::definite)
+					ret = klee::KInstruction::definite;
+			}
+		}else if (bit->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(bit);
 			unsigned argvs = ci->getNumArgOperands();
 			Function* func = ci->getCalledFunction();
@@ -741,8 +807,9 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 			if (!func->isDeclaration()) {
 				std::set<std::string> opGVar;
 				klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
-				if (temp == klee::KInstruction::possible)
+				if (temp == klee::KInstruction::possible) {
 					return klee::KInstruction::possible;
+				}
 				if (temp == klee::KInstruction::definite) {
 					ret = temp;
 					allGvar.insert(opGVar.begin(), opGVar.end());
@@ -750,7 +817,6 @@ ListenerService::basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::
 			}
 		}
 	}
-
 	return ret;
 }
 
@@ -758,8 +824,6 @@ klee::KInstruction::BranchType
 ListenerService::funcOpGlobal(std::set<std::string> &funcNameSet,
 		llvm::Function *func, std::set<std::string> &opGVar) {
 	std::string funcName = func->getName().str();
-	if (funcNameSet.size() > 0 && funcNameSet.find(funcName) != funcNameSet.end())
-		return klee::KInstruction::none;
 
 	klee::KInstruction::BranchType ret = klee::KInstruction::none;
 
@@ -796,8 +860,10 @@ ListenerService::funcOpGlobal(std::set<std::string> &funcNameSet,
 		} else if (inst->getOpcode() == Instruction::Call) {
 			CallInst* ci = cast<CallInst>(inst);
 			Function* func = ci->getCalledFunction();
-
 			if (!func->isDeclaration()) {
+				if (funcNameSet.size() > 0 &&
+						funcNameSet.find(func->getName().str()) != funcNameSet.end())
+					continue;
 				klee::KInstruction::BranchType temp = funcOpGlobal(funcNameSet, func, opGVar);
 				if (temp == klee::KInstruction::possible)
 						return klee::KInstruction::possible;

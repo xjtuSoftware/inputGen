@@ -26,7 +26,10 @@ private:
 	struct timeval start, finish;
 
 	klee::KInstruction::BranchType
-		basicBlockOpGlobal(llvm::BasicBlock *basicBlock, std::set<std::string> &);
+		basicBlockOpGlobal(
+				llvm::BasicBlock *basicBlock,
+				std::set<std::string> &varNames,
+				std::set<std::string> &bbNames);
 	klee::KInstruction::BranchType
 		funcOpGlobal(std::set<std::string>&, llvm::Function *, std::set<std::string>&);
 	klee::KInstruction::BranchType instOpGlobal(llvm::Instruction *, std::set<std::string> &);

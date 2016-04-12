@@ -3979,28 +3979,28 @@ void Executor::runFunctionAsMain(Function *f, int argc, char **argv,
 				MemoryObject *arg = memory->allocate(len + 1, true, false,
 						state->currentThread->pc->inst);
 				ObjectState *os = bindObjectInState(*state, arg, false);
-				if (inputGen && (i != 0 && i < argc)) {
+//				if (inputGen && (i != 0 && i < argc)) {
 //					executeMakeSymbolic(*state, arg, sym_arg_name);
 //					std::cerr << "execute make symbolic input generate.\n";
-					addressAndSize.insert(make_pair(arg->address,
-							arg->address + sizeof(char) * (len + 1)));
-					for (int t = 0; t < len; t++) {
-						std::stringstream ss;
-						ss << "argv[" << i << "][" << t << "]";
-						std::string name = ss.str();
-//						std::cerr << "argv name : " << name << std::endl;
-						charInfo.insert(make_pair(name, '\0'));
-						ref<Expr> symbolic = manualMakeSymbolic(*state, name, 8, false);
-						argvSymbolics.insert(symbolic);
-						os->write8(t, symbolic);
-						ss.clear();
-						ss.str("");
-					}
-					os->write8(len, s[len]);
-				} else {
+//					addressAndSize.insert(make_pair(arg->address,
+//							arg->address + sizeof(char) * (len + 1)));
+//					for (int t = 0; t < len; t++) {
+//						std::stringstream ss;
+//						ss << "argv[" << i << "][" << t << "]";
+//						std::string name = ss.str();
+////						std::cerr << "argv name : " << name << std::endl;
+//						charInfo.insert(make_pair(name, '\0'));
+//						ref<Expr> symbolic = manualMakeSymbolic(*state, name, 8, false);
+//						argvSymbolics.insert(symbolic);
+//						os->write8(t, symbolic);
+//						ss.clear();
+//						ss.str("");
+//					}
+//					os->write8(len, s[len]);
+//				} else {
 				for (j = 0; j < len + 1; j++)
 					os->write8(j, s[j]);
-				}
+//				}
 
 				// Write pointer to newly allocated and initialised argv/envp c-string
 				argvOS->write(i * NumPtrBytes, arg->getBaseExpr());
