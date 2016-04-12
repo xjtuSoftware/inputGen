@@ -1336,11 +1336,15 @@ void Encode::getPrefixFromMP() {
 		Event *curr = pureIfFormula[i].first;
 
 		assert(curr->isConditionIns);
+		BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 		if (curr->condition) {
-			if (curr->inst->falseBT == KInstruction::possible) {
-				negateSpecificBr(pureIfFormula[i]);
+			if (curr->inst->falseBT == KInstruction::possible &&
+					runtimeData->alreadyNegatedBB.find(bi->getSuccessor(1)) ==
+							runtimeData->alreadyNegatedBB.end()) {
+				runtimeData->alreadyNegatedBB.insert(bi->getSuccessor(1));
+					negateSpecificBr(pureIfFormula[i]);
 			} else if (curr->inst->falseBT == KInstruction::definite) {
-				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+
 				std::string brName = getBlockFullName(bi, false);
 
 				std::pair<std::multimap<std::string, std::string>::iterator,
@@ -1357,10 +1361,12 @@ void Encode::getPrefixFromMP() {
 				}
 			}
 		} else {
-			if (curr->inst->trueBT == KInstruction::possible) {
+			if (curr->inst->trueBT == KInstruction::possible &&
+					runtimeData->alreadyNegatedBB.find(bi->getSuccessor(0)) ==
+							runtimeData->alreadyNegatedBB.end()) {
+				runtimeData->alreadyNegatedBB.insert(bi->getSuccessor(0));
 				negateSpecificBr(pureIfFormula[i]);
 			} else if (curr->inst->trueBT == KInstruction::definite) {
-				BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 				std::string brName = getBlockFullName(bi, true);
 
 				std::pair<std::multimap<std::string, std::string>::iterator,
