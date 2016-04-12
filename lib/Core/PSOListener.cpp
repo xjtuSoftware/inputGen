@@ -675,8 +675,19 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			ConstantExpr* condition = dyn_cast<ConstantExpr>(param);
 			if (condition->isTrue()) {
 				item->condition = true;
+				if (ki->trueBT == KInstruction::possible) {
+					// std::cerr << "true possible name : " << bi->getSuccessor(0)->getName().str() <<
+					// ", line : " << ki->info->line << endl;
+					rdManager->alreadyNegatedBB.insert(bi->getSuccessor(0));
+				}
+
 			} else {
 				item->condition = false;
+				if (ki->falseBT == KInstruction::possible) {
+					// std::cerr << "false possible name : " << bi->getSuccessor(0)->getName().str() <<
+					// ", line : " << ki->info->line << endl;
+					rdManager->alreadyNegatedBB.insert(bi->getSuccessor(1));
+				}
 			}
 		}
 		break;

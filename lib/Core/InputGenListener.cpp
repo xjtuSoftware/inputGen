@@ -51,6 +51,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 			if (bi->isUnconditional()) {
 				break;
 			}
+			ref<Expr> constraint;
 			ref<Expr> value = executor->eval(ki, 0, thread).value;
 			Expr::Width width = value->getWidth();
 //			std::cerr << "width = " << width << std::endl;
@@ -61,6 +62,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 				} else {
 					concreteValue = ConstantExpr::create(false, width);
 				}
+				constraint = EqExpr::create(value, concreteValue);
 				executor->evalAgainst(ki, 0, thread, concreteValue);
 			} else {
 				break;
@@ -88,7 +90,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 //					ref<Expr> constraint = EqExpr::create(value, concreteValue);
 					Executor::BinTree * brNode = new Executor::binTree();
 
-					brNode->vecExpr.push_back(value);
+					brNode->vecExpr.push_back(constraint);
 					brNode->size = width;
 					brNode->brTrue = (*currentEvent)->condition;
 					brNode->currEvent = (*currentEvent);
@@ -581,11 +583,17 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 		} else {
 			Event *curr = temp->currEvent;
 			assert(curr->isConditionIns);
+			BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 			if (temp->brTrue) {
-				if (curr->inst->falseBT == KInstruction::possible) {
+
+				if (curr->inst->falseBT == KInstruction::possible &&
+						rdManager->alreadyNegatedBB.find(bi->getSuccessor(1)) ==
+						rdManager->alreadyNegatedBB.end()) {
+						rdManager->alreadyNegatedBB.insert(bi->getSuccessor(1));
+						// std::cerr << "false curr temp info : " << curr->inst->info->line << endl;
 					negateThisBranch(temp);
 				} else if (curr->inst->falseBT == KInstruction::definite) {
-					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+
 					std::string brName = getBlockFullName(bi, false);
 
 					std::pair<std::multimap<std::string, std::string>::iterator,
@@ -597,10 +605,14 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 					}
 				}
 			} else {
-				if (curr->inst->trueBT == KInstruction::possible) {
+				if (curr->inst->trueBT == KInstruction::possible &&
+						rdManager->alreadyNegatedBB.find(bi->getSuccessor(0)) ==
+						rdManager->alreadyNegatedBB.end()) {
+						rdManager->alreadyNegatedBB.insert(bi->getSuccessor(0));
+						// std::cerr << "true curr temp info : " << curr->inst->info->line << endl;
 					negateThisBranch(temp);
 				} else if (curr->inst->trueBT == KInstruction::definite) {
-					BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+
 					std::string brName = getBlockFullName(bi, true);
 
 					std::pair<std::multimap<std::string, std::string>::iterator,
@@ -685,20 +697,20 @@ void InputGenListener::negateThisBranch(Executor::BinTree *node) {
 	ref<Expr> falseExpr = ConstantExpr::create(false, width);
 	ref<Expr> constraint = ConstantExpr::create(true, width);
 	while (temp != node) {
-		if (temp->brTrue) {
-			constraint = EqExpr::create(trueExpr, temp->vecExpr[0]);
-		} else {
-			constraint = EqExpr::create(falseExpr, temp->vecExpr[0]);
-		}
-		constraints.push_back(constraint);
+//		if (temp->brTrue) {
+//			constraint = EqExpr::create(trueExpr, temp->vecExpr[0]);
+//		} else {
+//			constraint = EqExpr::create(falseExpr, temp->vecExpr[0]);
+//		}
+		constraints.push_back(temp->vecExpr[0]);
 		temp = temp->next;
 	}
-	if (temp->brTrue) {
-		constraint = EqExpr::create(falseExpr, temp->vecExpr[0]);
-	} else {
-		constraint = EqExpr::create(trueExpr, temp->vecExpr[0]);
-	}
-	constraints.push_back(constraint);
+//	if (temp->brTrue) {
+//		constraint = EqExpr::create(falseExpr, temp->vecExpr[0]);
+//	} else {
+//		constraint = EqExpr::create(trueExpr, temp->vecExpr[0]);
+//	}
+	constraints.push_back(temp->vecExpr[0]);
 	// get the solved result from all these constraints.
 	getSolveResult(constraints, node);
 }
@@ -754,12 +766,16 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			constraints.begin(), ie = constraints.end();
 	//short for push.
 	z3_solver.push();
-	while (it != ie) {
+	while (it != (ie - 1)) {
 //			(*it)->dump();
 		z3::expr res = kq->getZ3Expr((*it));
 		z3_solver.add(res);
 		it++;
 	}
+	z3::expr resTemp = kq->getZ3Expr((*it));
+	// std::cerr << "z3 expr: " << endl;
+	// std::cerr << resTemp << endl;
+	z3_solver.add(!resTemp);
 	check_result result = z3_solver.check();
 	if (result == z3::sat) {
 		std::cerr << "satisfied the constraints in get solve result.\n";

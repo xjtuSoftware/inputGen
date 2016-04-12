@@ -1541,6 +1541,9 @@ void Encode::deleteMPFromThisExe() {
 //							}
 //							std::cerr << "delete pair mp1 = " << mp1 << ", mp2 = " << mp2 << endl;
 						}
+						if (it->first == mp2 && it->second == mp1) {
+							runtimeData->MP.erase(it);
+						}
 					}
 				}
 			}

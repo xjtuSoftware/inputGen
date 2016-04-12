@@ -72,6 +72,8 @@ public:
 	std::multimap<std::string, std::string> MP;
 	std::set<std::string> possibleBranch;
 
+	std::set<llvm::BasicBlock*> alreadyNegatedBB;
+
 	RuntimeDataManager();
 	virtual ~RuntimeDataManager();
 
