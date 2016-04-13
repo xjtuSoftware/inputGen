@@ -41,6 +41,7 @@ public:
 	uint64_t getNextThreadId();
 	unsigned getCurrentEventThreadId();
 	void print(std::ostream &out);
+	void print(std::ostream &out, bool flag);
 	void print(llvm::raw_ostream &out);
 	KInstruction* getCurrentInst();
 	std::string getName();

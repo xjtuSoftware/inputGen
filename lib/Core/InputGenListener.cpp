@@ -123,7 +123,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 			if (cond->getKind() != Expr::Constant) {
 				Executor::BinTree * switchStat = new Executor::binTree();
 				ref<Expr> concreteValue = (*currentEvent)->value.at(0);
-				std::cerr << "concrete value : " << concreteValue << std::endl;
+//				std::cerr << "concrete value : " << concreteValue << std::endl;
 				ref<Expr> mainCons = EqExpr::create(cond, concreteValue);
 				switchStat->isSwitch = true;
 				switchStat->switchValue = concreteValue;
@@ -169,7 +169,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 						ref<Expr> value = executor->eval(ki, i, thread).value;
 						if (value->getKind() != Expr::Constant) {
 							ref<Expr> concreteValue = (*currentEvent)->value[i - 1];
-							std::cerr << "concrete value : " << concreteValue << std::endl;
+//							std::cerr << "concrete value : " << concreteValue << std::endl;
 							executor->evalAgainst(ki, i, thread, concreteValue);
 						}
 					}
@@ -580,6 +580,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 			// current branch is a switch statement.
 		} else {
 			Event *curr = temp->currEvent;
+//			std::cerr << curr->toString() << endl;
 			assert(curr->isConditionIns);
 			if (temp->brTrue) {
 				if (curr->inst->falseBT == KInstruction::possible) {
@@ -828,6 +829,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 
 		//get prefix and store them in the runtime data manager.
 		std::vector<Event*> vecEvent;
+//		std::cerr << "branch point : " << node->currEvent->toString() << endl;
 		getPrefixFromPath(vecEvent, node->currEvent);
 		Prefix* prefix = new Prefix(vecEvent,
 				rdManager->getCurrentTrace()->createThreadPoint, "mapOfInputAndPreix");

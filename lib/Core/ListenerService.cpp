@@ -192,6 +192,7 @@ void ListenerService::changeInputAndPrefix(int argc, char** argv, Executor* exec
 		std::map<Prefix*, std::vector<std::string> >::iterator it =
 				rdManager.symbolicInputPrefix.begin();
 		executor->prefix = it->first;
+//		executor->prefix->print(std::cerr, true);
 		int i = 1;
 
 		std::vector<std::string>::size_type cnt = it->second.size();
@@ -350,8 +351,7 @@ ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 			CallInst* ci = cast<CallInst>(bit);
 			unsigned argvs = ci->getNumArgOperands();
 			Function* func = ci->getCalledFunction();
-//			std::cerr << "name : " << func->getName().str() << endl;
-//			if (func->isNullValue()) {
+			if (!(func == NULL)) {
 				if (func->getName().str() == "printf" ||
 						func->getName().str() == "sprintf" ||
 						func->getName().str() == "fprintf") {
@@ -378,7 +378,7 @@ ListenerService::processEntryBlock(llvm::BasicBlock *bb) {
 						}
 					}
 				}
-//			}
+			}
 		}
 		bit++;
 		tempInst = dyn_cast<Instruction>(bit);
@@ -458,7 +458,7 @@ void ListenerService::preparation(Executor *executor) {
 					optiInst = optiInst->getNextNode();
 				}
 				if (isPossible) {
-					std::cerr << "that's possible branch." << endl;
+//					std::cerr << "that's possible branch." << endl;
 					ki->trueBT = KInstruction::possible;
 					ki->falseBT = KInstruction::possible;
 				} else {

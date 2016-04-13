@@ -77,6 +77,15 @@ unsigned Prefix::getCurrentEventThreadId() {
 	return event->threadId;
 }
 
+void Prefix::print(ostream &out, bool flag) {
+	for (vector<Event*>::iterator ei = eventList.begin(), ee = eventList.end(); ei != ee; ei++) {
+		Event* event = *ei;
+		out << event->toString() << endl;
+//		out << "thread : " << event->threadId << " " << event->inst->inst->print(std::cerr) << endl;
+	}
+	out << "prefix print finished\n";
+}
+
 void Prefix::print(ostream &out) {
 	for (vector<Event*>::iterator ei = eventList.begin(), ee = eventList.end(); ei != ee; ei++) {
 		Event* event = *ei;
