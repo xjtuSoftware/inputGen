@@ -285,13 +285,35 @@ void DealWithSymbolicExpr::filterUseless(Trace* trace) {
 	}
 #endif
 
+	std::cerr << "source read set size:" << trace->readSet.size() << std::endl;
+	std::map<std::string, std::vector<Event *> >::iterator itr = trace->readSet.begin(),
+			ier = trace->readSet.end();
+	unsigned cntR = 0;
+	for (; itr != ier; itr++) {
+		std::cerr << "var Name : " << itr->first << std::endl;
+		cntR += itr->second.size();
+	}
+	std::cerr << "size = " << cntR << std::endl;
+	std::cout << "source write set size:" << trace->writeSet.size() << std::endl;
+	std::map<std::string, std::vector<Event *> >::iterator itw = trace->writeSet.begin(),
+				iew = trace->writeSet.end();
+		unsigned cntW = 0;
+		for (; itw != iew; itw++) {
+			std::cerr << "var Name : " << itw->first << std::endl;
+			cntW += itw->second.size();
+		}
+	std::cerr << "size = " << cntW << std::endl;
+
+
 	std::map<std::string, long> &varThread = trace->varThread;
 
 	std::map<std::string, std::vector<Event *> > usefulReadSet;
 	std::map<std::string, std::vector<Event *> > &readSet = trace->readSet;
+	std::map<std::string, std::vector<Event *> > &allReadSet = trace->allReadSet;
 	usefulReadSet.clear();
 	for (std::map<std::string, std::vector<Event *> >::iterator nit =
 			readSet.begin(), nie = readSet.end(); nit != nie; ++nit) {
+		allReadSet.insert(*nit);
 		varName = nit->first;
 		if (allRelatedSymbolicExpr.find(varName) != allRelatedSymbolicExpr.end() || OP1) {
 			usefulReadSet.insert(*nit);
@@ -321,9 +343,11 @@ void DealWithSymbolicExpr::filterUseless(Trace* trace) {
 
 	std::map<std::string, std::vector<Event *> > usefulWriteSet;
 	std::map<std::string, std::vector<Event *> > &writeSet = trace->writeSet;
+	std::map<std::string, std::vector<Event *> > &allWriteSet = trace->allWriteSet;
 	usefulWriteSet.clear();
 	for (std::map<std::string, std::vector<Event *> >::iterator nit =
 			writeSet.begin(), nie = writeSet.end(); nit != nie; ++nit) {
+		allWriteSet.insert(*nit);
 		varName = nit->first;
 		if (allRelatedSymbolicExpr.find(varName) != allRelatedSymbolicExpr.end() || OP1) {
 			usefulWriteSet.insert(*nit);
@@ -388,7 +412,7 @@ void DealWithSymbolicExpr::filterUseless(Trace* trace) {
 			if ((*currentEvent)->inst->inst->getOpcode() == llvm::Instruction::Load
 					|| (*currentEvent)->inst->inst->getOpcode() == llvm::Instruction::Store) {
 				if (allRelatedSymbolicExpr.find((*currentEvent)->varName) == allRelatedSymbolicExpr.end() && !OP1) {
-					(*currentEvent)->isGlobal = false;
+//					(*currentEvent)->isGlobal = false;
 					(*currentEvent)->usefulGlobal = false;
 				} else {
 					(*currentEvent)->usefulGlobal = true;

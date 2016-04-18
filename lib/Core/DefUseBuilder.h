@@ -48,9 +48,17 @@ private:
 	void buildDefUse(Event*, Event*, map<string, vector<Event *> >::iterator);
 	Event* getLatestWriteInCurPath(Event*, map<string, vector<Event *> >::iterator);
 
-	void buildExpr(Event*, Event*, map<string, vector<Event *> >::iterator, expr&);
+	void buildExpr(Event*, Event*, expr&);
+	void buildExpr_AddAllWrite(Event*, Event*, map<string, vector<Event *> >::iterator, expr&);
+	Event* getPrevEventInThread(Event*);
+	Event* getNextEventInThread(Event*);
+	bool isCoveredOrUnsolved(DefUse*, std::vector<DefUse*>&);
 	bool isCoveredPrePath(DefUse*);
-	bool isValid(const expr&);
+	bool isUnsolvedPrePath(DefUse*);
+	bool isCoveredExplicit(DefUse*);
+	void removeFromUnsolved(DefUse*);
+	bool isValid(Event*, Event*, const expr&);
+	void addIfFormula(Event*);
 
 	void markLatestWriteForGlobalVar();
 	void markLatestReadOrWriteForGlobalVar();

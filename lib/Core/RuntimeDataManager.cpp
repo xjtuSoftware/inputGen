@@ -38,14 +38,12 @@ RuntimeDataManager::RuntimeDataManager() :
 	satCost = 0.0;
 	unSatCost = 0.0;
 	runState = 0;
+	allMP = 0;
 }
 
 RuntimeDataManager::~RuntimeDataManager() {
 	// TODO Auto-generated destructor stub
-	for (vector<Trace*>::iterator ti = traceList.begin(), te = traceList.end();
-			ti != te; ti++) {
-		delete *ti;
-	}
+
 
 	string ErrorInfo;
 	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, 0x0202);
@@ -92,24 +90,68 @@ RuntimeDataManager::~RuntimeDataManager() {
 	ss << "SolvingCost:" << solvingCost << "\n";
 	ss << "RunningCost:" << runningCost << "\n";
 	ss << "inputCost:" << inputCost << "\n";
-	ss << "def-use size:" << coveredDefUse_pre.size() << "\n";
+	ss << "already negated branch:" << alreadyNegatedBB.size() << "\n";
+	ss << "all MP:" << allMP << "\n";
+	ss << "left MP:" << MP.size() << "\n";
+	ss << "covered  def-use size:" << coveredDefUse_pre.size() << "\n";
+	ss << "explicit def-use size:" << this->explicitDefUse_pre.size() << "\n";
+	ss << "implicit def-use size:" << this->implicitDefUse_pre.size() << "\n";
+	ss << "unsolved def-use size:" << this->unsolvedDefUse_pre.size() << "\n";
 	out_to_file << ss.str();
 	out_to_file.close();
+
+	raw_fd_ostream duout_to_file("./output_info/du.txt", ErrorInfo, 0x0202);
+	stringstream duss;
+	for (unsigned i = 0; i < explicitDefUse_pre.size(); i++) {
+		if (explicitDefUse_pre[i]->pre == NULL) {
+			duss << "NULL ";
+		} else {
+			duss << explicitDefUse_pre[i]->pre->inst->info->line << " ";
+		}
+			duss << explicitDefUse_pre[i]->post->inst->info->line << "\n";
+	}
+//	duss << "unsolved du: " << "\n";
+//
+//	for (unsigned i = 0; i < unsolvedDefUse_pre.size(); i++) {
+//		if (unsolvedDefUse_pre[i]->pre != NULL) {
+//			duss << unsolvedDefUse_pre[i]->pre->toString() << " ";
+//		}
+//		duss << unsolvedDefUse_pre[i]->post->toString() << "\n";
+//	}
+	duout_to_file << duss.str();
+	duout_to_file.close();
+
+	for (vector<Trace*>::iterator ti = traceList.begin(), te = traceList.end();
+			ti != te; ti++) {
+		delete *ti;
+	}
 
 	/* added : Apr 5, 2016
 	 * Author: hhfan
 	 */
 	//free memory space
-	std::vector<DefUse*>::iterator duIte = coveredDefUse_pre.begin();
-	while(duIte != coveredDefUse_pre.end()){
-		delete *duIte;
-		*duIte = NULL;
-		duIte++;
+	std::vector<DefUse*>::iterator coveredDuIte = coveredDefUse_pre.begin();
+	while(coveredDuIte != coveredDefUse_pre.end()){
+		delete *coveredDuIte;
+		*coveredDuIte = NULL;
+		coveredDuIte++;
 	}
+	std::vector<DefUse*>::iterator unsolvedDuIte = unsolvedDefUse_pre.begin();
+	while(unsolvedDuIte != unsolvedDefUse_pre.end()){
+		delete *unsolvedDuIte;
+		*unsolvedDuIte = NULL;
+		unsolvedDuIte++;
+	}
+
 	coveredDefUse_pre.clear();
+	unsolvedDefUse_pre.clear();
+	explicitDefUse_pre.clear();
+	implicitDefUse_pre.clear();
+
 	std::vector<DefUse*>().swap(coveredDefUse_pre);
-
-
+	std::vector<DefUse*>().swap(unsolvedDefUse_pre);
+	std::vector<DefUse*>().swap(explicitDefUse_pre);
+	std::vector<DefUse*>().swap(implicitDefUse_pre);
 }
 
 Trace* RuntimeDataManager::createNewTrace(unsigned traceId) {

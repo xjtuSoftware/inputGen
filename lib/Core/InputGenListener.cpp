@@ -171,7 +171,7 @@ void InputGenListener::executeInstruction(ExecutionState &state, KInstruction *k
 						ref<Expr> value = executor->eval(ki, i, thread).value;
 						if (value->getKind() != Expr::Constant) {
 							ref<Expr> concreteValue = (*currentEvent)->value[i - 1];
-							std::cerr << "concrete value : " << concreteValue << std::endl;
+//							std::cerr << "concrete value : " << concreteValue << std::endl;
 							executor->evalAgainst(ki, i, thread, concreteValue);
 						}
 					}
@@ -327,10 +327,10 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 void InputGenListener::afterRunMethodAsMain() {
 //	std::cerr << "print the symbolic tree to debug.\n";
 //
-//	if (executor->headSentinel != NULL) {
-//		Executor::BinTree * head = executor->headSentinel;
-//		printSymbolicNode(head);
-//	}
+	if (executor->headSentinel != NULL) {
+		Executor::BinTree * head = executor->headSentinel;
+		printSymbolicNode(head);
+	}
 
 //	std::cerr << "input generate calling start.\n";
 	inputGen(InputGenListener::DFS);
@@ -584,13 +584,17 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 			Event *curr = temp->currEvent;
 			assert(curr->isConditionIns);
 			BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
+			temp->vecExpr[0]->dump();
+			bi->dump();
+			std::cerr << "curr true : " << curr->inst->trueBT <<
+					", curr false : " << curr->inst->falseBT << endl;
 			if (temp->brTrue) {
 
 				if (curr->inst->falseBT == KInstruction::possible &&
 						rdManager->alreadyNegatedBB.find(bi->getSuccessor(1)) ==
 						rdManager->alreadyNegatedBB.end()) {
-						rdManager->alreadyNegatedBB.insert(bi->getSuccessor(1));
-						// std::cerr << "false curr temp info : " << curr->inst->info->line << endl;
+//						rdManager->alreadyNegatedBB.insert(bi->getSuccessor(1));
+//						 std::cerr << "false curr temp info : " << curr->inst->info->line << endl;
 					negateThisBranch(temp);
 				} else if (curr->inst->falseBT == KInstruction::definite) {
 
@@ -608,8 +612,8 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 				if (curr->inst->trueBT == KInstruction::possible &&
 						rdManager->alreadyNegatedBB.find(bi->getSuccessor(0)) ==
 						rdManager->alreadyNegatedBB.end()) {
-						rdManager->alreadyNegatedBB.insert(bi->getSuccessor(0));
-						// std::cerr << "true curr temp info : " << curr->inst->info->line << endl;
+//						rdManager->alreadyNegatedBB.insert(bi->getSuccessor(0));
+//						 std::cerr << "true curr temp info : " << curr->inst->info->line << endl;
 					negateThisBranch(temp);
 				} else if (curr->inst->trueBT == KInstruction::definite) {
 
@@ -804,7 +808,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			sr << m.eval(realExpr);
 //			std::cerr << "sr = " << sr.str().c_str() << std::endl;
 			int temp = atoi(sr.str().c_str());
-//			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
+			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
 			rdManager->intArgv[iit->first] = (unsigned)temp;
 			sr.str("");
 		}

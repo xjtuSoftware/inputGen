@@ -171,8 +171,8 @@ void Trace::printWaitAndSignal(raw_ostream& out) {
 
 void Trace::printReadSetAndWriteSet(raw_ostream& out) {
 	out << "<----ReadSet---->\n";
-	for (map<string, vector<Event *> >::iterator ri = readSet.begin(), re =
-			readSet.end(); ri != re; ri++) {
+	for (map<string, vector<Event *> >::iterator ri = allReadSet.begin(), re =
+			allReadSet.end(); ri != re; ri++) {
 		out << ri->first << " is readed at " << "\n";
 		for (vector<Event*>::iterator vi = ri->second.begin(), ve =
 				ri->second.end(); vi != ve; vi++) {
@@ -180,8 +180,8 @@ void Trace::printReadSetAndWriteSet(raw_ostream& out) {
 		}
 	}
 	out << "<----WriteSet---->\n";
-	for (map<string, vector<Event *> >::iterator wi = writeSet.begin(), we =
-			writeSet.end(); wi != we; wi++) {
+	for (map<string, vector<Event *> >::iterator wi = allWriteSet.begin(), we =
+			allWriteSet.end(); wi != we; wi++) {
 		out << wi->first << " is writed at \n";
 		for (vector<Event*>::iterator vi = wi->second.begin(), ve =
 				wi->second.end(); vi != ve; vi++) {

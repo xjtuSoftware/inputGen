@@ -37,7 +37,9 @@ private:
 	 */
 public:
 	std::vector<DefUse*> coveredDefUse_pre;		//def-use(s) has been covered in previous paths.
-
+	std::vector<DefUse*> explicitDefUse_pre;
+	std::vector<DefUse*> implicitDefUse_pre;
+	std::vector<DefUse*> unsolvedDefUse_pre;
 
 public:
 	//newly added stastic info
@@ -53,6 +55,8 @@ public:
 	double inputCost;
 	double satCost;
 	double unSatCost;
+
+	unsigned allMP;
 
 	char **pArgv;
 	int iArgc;

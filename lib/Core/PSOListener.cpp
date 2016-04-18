@@ -35,6 +35,8 @@ using namespace llvm;
 #define DEBUGSTRCPY 0
 #define COND_DEBUG 0
 
+#define  POSSIBLE_DELETE 1
+
 namespace klee {
 
 Event* lastEvent;
@@ -146,6 +148,7 @@ void PSOListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = rdManager->getCurrentTrace();
 	Instruction* inst = ki->inst;
+	inst->dump();
 	std::string bbFullName = inst->getParent()->getParent()->getName().str() +
 			"." + inst->getParent()->getName().str();
 	std::map<llvm::BasicBlock*, std::set<std::string> >::iterator bbIt =
@@ -675,19 +678,23 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			ConstantExpr* condition = dyn_cast<ConstantExpr>(param);
 			if (condition->isTrue()) {
 				item->condition = true;
+#if POSSIBLE_DELETE
 				if (ki->trueBT == KInstruction::possible) {
 					// std::cerr << "true possible name : " << bi->getSuccessor(0)->getName().str() <<
 					// ", line : " << ki->info->line << endl;
 					rdManager->alreadyNegatedBB.insert(bi->getSuccessor(0));
 				}
+#endif
 
 			} else {
 				item->condition = false;
+#if POSSIBLE_DELETE
 				if (ki->falseBT == KInstruction::possible) {
 					// std::cerr << "false possible name : " << bi->getSuccessor(0)->getName().str() <<
 					// ", line : " << ki->info->line << endl;
 					rdManager->alreadyNegatedBB.insert(bi->getSuccessor(1));
 				}
+#endif
 			}
 		}
 		break;
@@ -737,7 +744,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 					}
 					item->globalVarFullName = varFullName;
 					item->varName = varName;
-//					cerr << varName << "\n";
+					cerr << varName << "\n";
 #if PTR
 					if (item->isGlobal) {
 #else

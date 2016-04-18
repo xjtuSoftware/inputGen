@@ -65,6 +65,7 @@
 #define BIT_WIDTH 64
 #define POINT_BIT_WIDTH 64
 #define INT_ARITHMETIC 0
+#define DELETE_ALL_MP 0
 
 
 using namespace llvm;
@@ -84,6 +85,12 @@ void Encode::buildAllFormula() {
 	buildPartialOrderFormula();
 	buildReadWriteFormula(z3_solver);
 	buildSynchronizeFormula();
+
+	buildInitValueFormula_du(z3_solver_du);
+	buildPathCondition(z3_solver_du);
+	buildReadWriteFormula_du(z3_solver_du);
+
+
 	//debug: test satisfy of the model
 //	check_result result = z3_solver.check();
 //	if (result != z3::sat) {
@@ -773,8 +780,8 @@ void Encode::logStatisticInfo() {
 	unsigned signalNumber = trace->all_signal.size();
 	unsigned waitNumber = trace->all_wait.size();
 	unsigned sharedVarNumber = trace->global_variable_final.size();
-	unsigned readNumber = trace->readSet.size();
-	unsigned writeNumber = trace->writeSet.size();
+	unsigned readNumber = trace->allReadSet.size();
+	unsigned writeNumber = trace->allWriteSet.size();
 	string ErrorInfo;
 	raw_fd_ostream out("./output_info/statistic.info", ErrorInfo, 0x0200);
 	out << "#Threads:" << threadNumber << "\n";
@@ -788,7 +795,7 @@ void Encode::logStatisticInfo() {
 //	out << "#Constaints: " << constaintNumber << "\n";
 }
 
-void Encode::buildInitValueFormula(solver z3_solver_init) {
+void Encode::buildInitValueFormula(solver &z3_solver_init) {
 //for global initializer
 #if FORMULA_DEBUG
 	cerr << "\nGlobal var initial value:\n";
@@ -812,6 +819,32 @@ void Encode::buildInitValueFormula(solver z3_solver_init) {
 	}
 	//statics
 	formulaNum += trace->useful_global_variable_initializer.size();
+}
+
+void Encode::buildInitValueFormula_du(solver &z3_solver_init) {
+//for global initializer
+#if FORMULA_DEBUG
+	cerr << "\nGlobal var initial value:\n";
+	cerr << "\nGlobal var initial size: " << trace->variable_initializer.size() << "\n";
+#endif
+	std::map<std::string, llvm::Constant*>::iterator gvi =
+			trace->global_variable_initializer.begin();
+
+	for (; gvi != trace->global_variable_initializer.end(); gvi++) {
+		//bitwidth may introduce bug!!!
+		const Type *type = gvi->second->getType();
+		const z3::sort varType(llvmTy_to_z3Ty(type));
+		string str = gvi->first + "_Init";
+		expr lhs = z3_ctx.constant(str.c_str(), varType);
+		expr rhs = buildExprForConstantValue(gvi->second, false, "");
+		z3_solver_init.add(lhs == rhs);
+
+#if FORMULA_DEBUG
+		cerr << (lhs == rhs) << "\n";
+#endif
+	}
+	//statics
+	formulaNum += trace->global_variable_initializer.size();
 }
 
 void Encode::buildOutputFormula() {
@@ -884,8 +917,8 @@ void Encode::markLatestWriteForGlobalVar() {
 			continue;
 		for (unsigned index = 0; index < thread->size(); index++) {
 			Event* event = thread->at(index);
-			if (event->usefulGlobal) {
-//			if (event->isGlobal) {
+//			if (event->usefulGlobal) {
+			if (event->isGlobal) {
 				Instruction *I = event->inst->inst;
 				if (StoreInst::classof(I)) { //write
 					latestWriteOneThread[event->varName] = event;
@@ -916,7 +949,7 @@ void Encode::markLatestWriteForGlobalVar() {
 	}
 }
 
-void Encode::buildPathCondition(solver z3_solver_pc) {
+void Encode::buildPathCondition(solver &z3_solver_pc) {
 #if FORMULA_DEBUG
 	cerr << "\nBasicFormula:\n";
 #endif
@@ -1030,6 +1063,7 @@ void Encode::buildifAndassert() {
 //		cerr << "rwSymbolicExpr : " << res << "\n";
 	}
 	buildAllFormula();
+//	buildAllFormulaButPathCondition();
 }
 
 expr Encode::buildExprForConstantValue(Value *V, bool isLeft,
@@ -1180,6 +1214,7 @@ void Encode::buildMemoryModelFormula() {
 	cerr << "\nMemoryModelFormula:\n";
 #endif
 	z3_solver.add(z3_ctx.int_const("E_INIT") == 0);
+	z3_solver_du.add(z3_ctx.int_const("E_INIT") == 0);
 	//statics
 	formulaNum++;
 //level: 0 bitcode; 1 source code; 2 block
@@ -1199,6 +1234,7 @@ void Encode::buildMemoryModelFormula() {
 		cerr << temp1 << "\n";
 #endif
 		z3_solver.add(temp1);
+		z3_solver_du.add(temp1);
 
 		//final
 		Event* finalEvent = thread->back();
@@ -1209,6 +1245,7 @@ void Encode::buildMemoryModelFormula() {
 		cerr << temp2 << "\n";
 #endif
 		z3_solver.add(temp2);
+		z3_solver_du.add(temp2);
 		//statics
 		formulaNum += 2;
 	}
@@ -1234,6 +1271,7 @@ void Encode::buildMemoryModelFormula() {
 			cerr << temp << "\n";
 #endif
 			z3_solver.add(temp);
+			z3_solver_du.add(temp);
 			//statics
 			formulaNum++;
 
@@ -1246,6 +1284,8 @@ void Encode::buildMemoryModelFormula() {
 	}
 	z3_solver.add(
 			z3_ctx.int_const("E_FINAL") == z3_ctx.int_val(uniqueEvent) + 100);
+	z3_solver_du.add(
+				z3_ctx.int_const("E_FINAL") == z3_ctx.int_val(uniqueEvent) + 100);
 	//statics
 	formulaNum++;
 }
@@ -1325,6 +1365,7 @@ void Encode::tryNegateSecondBr(std::string paramName, unsigned s) {
 
 void Encode::getPrefixFromMP() {
 
+//	addPathCondition();
 	deleteMPFromThisExe();
 
 	preprocessWithIfFormula();
@@ -1341,7 +1382,7 @@ void Encode::getPrefixFromMP() {
 			if (curr->inst->falseBT == KInstruction::possible &&
 					runtimeData->alreadyNegatedBB.find(bi->getSuccessor(1)) ==
 							runtimeData->alreadyNegatedBB.end()) {
-				runtimeData->alreadyNegatedBB.insert(bi->getSuccessor(1));
+//				runtimeData->alreadyNegatedBB.insert(bi->getSuccessor(1));
 					negateSpecificBr(pureIfFormula[i]);
 			} else if (curr->inst->falseBT == KInstruction::definite) {
 
@@ -1364,7 +1405,7 @@ void Encode::getPrefixFromMP() {
 			if (curr->inst->trueBT == KInstruction::possible &&
 					runtimeData->alreadyNegatedBB.find(bi->getSuccessor(0)) ==
 							runtimeData->alreadyNegatedBB.end()) {
-				runtimeData->alreadyNegatedBB.insert(bi->getSuccessor(0));
+//				runtimeData->alreadyNegatedBB.insert(bi->getSuccessor(0));
 				negateSpecificBr(pureIfFormula[i]);
 			} else if (curr->inst->trueBT == KInstruction::definite) {
 				std::string brName = getBlockFullName(bi, true);
@@ -1547,9 +1588,11 @@ void Encode::deleteMPFromThisExe() {
 //							}
 //							std::cerr << "delete pair mp1 = " << mp1 << ", mp2 = " << mp2 << endl;
 						}
+#if DELETE_ALL_MP
 						if (it->first == mp2 && it->second == mp1) {
 							runtimeData->MP.erase(it);
 						}
+#endif
 					}
 				}
 			}
@@ -1855,6 +1898,7 @@ void Encode::buildPartialOrderFormula() {
 		cerr << twoEventOrder << "\n";
 #endif
 		z3_solver.add(twoEventOrder);
+		z3_solver_du.add(twoEventOrder);
 	}
 	//statics
 	formulaNum += trace->createThreadPoint.size();
@@ -1873,12 +1917,13 @@ void Encode::buildPartialOrderFormula() {
 		cerr << twoEventOrder << "\n";
 #endif
 		z3_solver.add(twoEventOrder);
+		z3_solver_du.add(twoEventOrder);
 	}
 	//statics
 	formulaNum += trace->joinThreadPoint.size();
 }
 
-void Encode::buildReadWriteFormula(solver z3_solver_rw) {
+void Encode::buildReadWriteFormula(solver &z3_solver_rw) {
 #if FORMULA_DEBUG
 	cerr << "\nReadWriteFormula:\n";
 #endif
@@ -2017,6 +2062,146 @@ void Encode::buildReadWriteFormula(solver z3_solver_rw) {
 	}
 }
 
+void Encode::buildReadWriteFormula_du(solver &z3_solver_rw) {
+
+#if FORMULA_DEBUG
+	cerr << "\nReadWriteFormula:\n";
+#endif
+//prepare
+	markLatestWriteForGlobalVar();
+//
+//	cerr << "size : " << trace->readSet.size()<<"\n";
+//	cerr << "size : " << trace->writeSet.size()<<"\n";
+	map<string, vector<Event *> >::iterator read;
+	map<string, vector<Event *> >::iterator write;
+
+//debug
+//print out all the read and write insts of global vars.
+	if (false) {
+		read = trace->allReadSet.begin();
+		for (; read != trace->allReadSet.end(); read++) {
+			cerr << "global var read:" << read->first << "\n";
+			for (unsigned i = 0; i < read->second.size(); i++) {
+				cerr << read->second[i]->eventName << "---"
+						<< read->second[i]->globalVarFullName << "\n";
+			}
+		}
+		write = trace->allWriteSet.begin();
+		for (; write != trace->allWriteSet.end(); write++) {
+			cerr << "global var write:" << write->first << "\n";
+			for (unsigned i = 0; i < write->second.size(); i++) {
+				cerr << write->second[i]->eventName << "---"
+						<< write->second[i]->globalVarFullName << "\n";
+			}
+		}
+	}
+//debug
+
+	map<string, vector<Event *> >::iterator ir = trace->allReadSet.begin(); //key--variable,
+	Event *currentRead;
+	Event *currentWrite;
+	for (; ir != trace->allReadSet.end(); ir++) {
+		map<string, vector<Event *> >::iterator iw = trace->allWriteSet.find(
+				ir->first);
+		//maybe use the initial value from Initialization.@2014.4.16
+		//if(iw == writeSet.end())
+		//continue;
+		for (unsigned k = 0; k < ir->second.size(); k++) {
+			vector<expr> oneVarAllRead;
+			currentRead = ir->second[k];
+			expr r = z3_ctx.int_const(currentRead->eventName.c_str());
+
+			//compute the write set that may be used by currentRead;
+			vector<Event *> mayBeRead;
+			unsigned currentWriteThreadId;
+			if (iw != trace->allWriteSet.end()) {
+				for (unsigned i = 0; i < iw->second.size(); i++) {
+					if (iw->second[i]->threadId == currentRead->threadId)
+						continue;
+					else
+						mayBeRead.push_back(iw->second[i]);
+				}
+			}
+			if (currentRead->latestWrite != NULL) {
+				mayBeRead.push_back(currentRead->latestWrite);
+			} else//if this read don't have the corresponding write, it may use from Initialization operation.
+			{
+				//so, build the formula constrainting this read uses from Initialization operation
+
+				vector<expr> oneVarOneRead;
+				expr equal = z3_ctx.bool_val(1);
+				bool flag = readFromInitFormula(currentRead, equal);
+				if (flag != false) {
+					//statics
+					formulaNum++;
+					oneVarOneRead.push_back(equal);
+					for (unsigned j = 0; j < mayBeRead.size(); j++) {
+						currentWrite = mayBeRead[j];
+						expr w = z3_ctx.int_const(
+								currentWrite->eventName.c_str());
+						expr order = r < w;
+						oneVarOneRead.push_back(order);
+					}
+					//statics
+					formulaNum += mayBeRead.size();
+					expr readFromInit = makeExprsAnd(oneVarOneRead);
+					oneVarAllRead.push_back(readFromInit);
+				}
+			}
+			//
+
+			for (unsigned i = 0; i < mayBeRead.size(); i++) {
+				//cause the write operation of every thread is arranged in the executing order
+				currentWrite = mayBeRead[i];
+				currentWriteThreadId = currentWrite->threadId;
+				vector<expr> oneVarOneRead;
+				expr equal = readFromWriteFormula(currentRead, currentWrite,
+						ir->first);
+				oneVarOneRead.push_back(equal);
+
+				expr w = z3_ctx.int_const(currentWrite->eventName.c_str());
+				expr rw = (w < r);
+				//statics
+				formulaNum += 2;
+				//-----optimization-----//
+				//the next write in the same thread must be behind this read.
+				if (i + 1 <= mayBeRead.size() - 1 &&			//short-circuit
+						mayBeRead[i + 1]->threadId == currentWriteThreadId) {
+					expr nextw = z3_ctx.int_const(
+							mayBeRead[i + 1]->eventName.c_str());
+					//statics
+					formulaNum++;
+					rw = (rw && (r < nextw));
+				}
+				//
+
+				oneVarOneRead.push_back(rw);
+
+				unsigned current = i;
+				for (unsigned j = 0; j < mayBeRead.size(); j++) {
+					if (current == j
+							|| currentWriteThreadId == mayBeRead[j]->threadId)
+						continue;
+					expr temp = enumerateOrder(currentRead, currentWrite,
+							mayBeRead[j]);
+					//statics
+					formulaNum += 2;
+					oneVarOneRead.push_back(temp);
+				}
+				//equal if-and-only-if possibleOrder
+				expr if_and_only_if = makeExprsAnd(oneVarOneRead);
+				oneVarAllRead.push_back(if_and_only_if);
+			}
+
+			expr oneReadExprs = makeExprsOr(oneVarAllRead);
+#if FORMULA_DEBUG
+			cerr << oneReadExprs << "\n";
+#endif
+			z3_solver_rw.add(oneReadExprs);
+		}
+	}
+}
+
 expr Encode::readFromWriteFormula(Event * read, Event * write, string var) {
 	Instruction *I = read->inst->inst;
 	const Type * type = I->getType();
@@ -2061,12 +2246,12 @@ bool Encode::readFromInitFormula(Event * read, expr& ret) {
 	expr r = z3_ctx.constant(read->globalVarFullName.c_str(), varType);
 	string globalVar = read->varName;
 	std::map<std::string, llvm::Constant*>::iterator tempIt =
-			trace->useful_global_variable_initializer.find(globalVar);
+			trace->global_variable_initializer.find(globalVar);
 //	assert(
 //			(tempIt != data.global_variable_initializer.end())
 //					&& "Wrong with global var!");
 //	cerr << "current event: " << read->eventName << "  current globalVar: " << globalVar << "\n";
-	if (tempIt == trace->useful_global_variable_initializer.end())
+	if (tempIt == trace->global_variable_initializer.end())
 		return false;
 	string str = tempIt->first + "_Init";
 	expr w = z3_ctx.constant(str.c_str(), varType);
@@ -2133,6 +2318,7 @@ void Encode::buildSynchronizeFormula() {
 					formulaNum += 2;
 				}
 				z3_solver.add(twinLockPairOrder);
+				z3_solver_du.add(twinLockPairOrder);
 #if FORMULA_DEBUG
 				cerr << twinLockPairOrder << "\n";
 #endif
@@ -2191,6 +2377,8 @@ void Encode::buildSynchronizeFormula() {
 #endif
 			z3_solver.add(one_wait);
 			z3_solver.add(wait_value);
+			z3_solver_du.add(one_wait);
+			z3_solver_du.add(wait_value);
 		}
 	}
 
@@ -2216,6 +2404,7 @@ void Encode::buildSynchronizeFormula() {
 			expr sum = makeExprsSum(mapLabel);
 			expr relation = (sum <= 1);
 			z3_solver.add(relation);
+			z3_solver_du.add(relation);
 		}
 	}
 
@@ -2241,6 +2430,7 @@ void Encode::buildSynchronizeFormula() {
 			expr sum = makeExprsSum(mapLabel);
 			expr relation = (sum >= 1);
 			z3_solver.add(relation);
+			z3_solver_du.add(relation);
 		}
 	}
 
@@ -2263,6 +2453,7 @@ void Encode::buildSynchronizeFormula() {
 							<< signalSet[j]->eventName;
 					expr map_wait_signal = z3_ctx.int_const(ss.str().c_str());
 					z3_solver.add(map_wait_signal == 0);
+					z3_solver_du.add(map_wait_signal == 0);
 				}
 			}
 		}
@@ -2287,6 +2478,7 @@ void Encode::buildSynchronizeFormula() {
 			cerr << relation << "\n";
 #endif
 			z3_solver.add(relation);
+			z3_solver_du.add(relation);
 		}
 	}
 }
@@ -2330,5 +2522,18 @@ expr Encode::makeExprsSum(vector<expr> exprs) {
 	return ret;
 }
 
+void Encode::buildAllFormulaButPathCondition() {
+	buildInitValueFormula(z3_solver);
+	buildMemoryModelFormula();
+	buildPartialOrderFormula();
+	buildReadWriteFormula(z3_solver);
+	buildSynchronizeFormula();
 }
+
+void Encode::addPathCondition() {
+	buildPathCondition(z3_solver);
+}
+
+}
+
 

@@ -39,10 +39,11 @@ private:
 public:
 	context z3_ctx;
 	solver z3_solver;
+	solver z3_solver_du;
 
 public:
 	Encode(RuntimeDataManager* data) :
-			runtimeData(data), z3_solver(z3_ctx), branchPoint(NULL) {
+			runtimeData(data), branchPoint(NULL), z3_solver(z3_ctx), z3_solver_du(z3_ctx) {
 		trace = data->getCurrentTrace();
 		formulaNum = 0;
 		solvingTimes = 0;
@@ -52,6 +53,8 @@ public:
 		runtimeData->solvingTimes += solvingTimes;
 	}
 	void buildAllFormula();
+	void buildAllFormulaButPathCondition();
+	void addPathCondition();
 	void buildInputNeedFormula();
 	void buildifAndassert();
 	void showInitTrace();
@@ -83,13 +86,16 @@ private:
 
 	vector<pair<Event*, expr> > pureIfFormula;
 
-	void buildInitValueFormula(solver z3_solver_init);
-	void buildPathCondition(solver z3_solver_pc);
+	void buildInitValueFormula(solver &z3_solver_init);
+	void buildPathCondition(solver &z3_solver_pc);
 	void buildMemoryModelFormula();
 	void buildPartialOrderFormula();
-	void buildReadWriteFormula(solver z3_solver_rw);
+	void buildReadWriteFormula(solver &z3_solver_rw);
 	void buildSynchronizeFormula();
 	void buildOutputFormula();
+
+	void buildInitValueFormula_du(solver &z3_solver_init);
+	void buildReadWriteFormula_du(solver &z3_solver_rw);
 
 	expr buildExprForConstantValue(Value *V, bool isLeft, string prefix);
 

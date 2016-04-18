@@ -8,6 +8,7 @@
 #include "DefUseBuilder.h"
 #include "Executor.h"
 #include "KQuery2Z3.h"
+#include "llvm/IR/Module.h"
 #include <map>
 #include <vector>
 
@@ -21,11 +22,14 @@ using namespace z3;
 #define PRINT_OPERATION_SET_DETAILED 0
 #define PRINT_OPERATION_SET_BRIEFLY 0
 #define PRINT_DEF_USE 0
+#define DELETE_MP_DU 0
+
 namespace klee {
 
 DefUseBuilder::DefUseBuilder(RuntimeDataManager& data_t, Encode& encode_t) :
 		rdManager(data_t), encode(encode_t) {
 	trace = data_t.getCurrentTrace();
+	std::cerr << "trace = " << trace << endl;
 	currentEvent = NULL;
 }
 
@@ -69,8 +73,22 @@ Event* DefUseBuilder::getLatestWriteInCurPath(Event* curRead, map<string, vector
  */
 void DefUseBuilder::buildDefUseForCurPath() {
 
-	std::cout << "read set size:" << trace->readSet.size() << std::endl;
-	std::cout << "write set size:" << trace->writeSet.size() << std::endl;
+	std::cerr << "read set size:" << trace->allReadSet.size() << std::endl;
+	std::map<std::string, std::vector<Event *> >::iterator itr = trace->allReadSet.begin(),
+			ier = trace->allReadSet.end();
+	unsigned cntR = 0;
+	for (; itr != ier; itr++) {
+		cntR += itr->second.size();
+	}
+	std::cerr << "size = " << cntR << endl;
+	std::cout << "write set size:" << trace->allWriteSet.size() << std::endl;
+	std::map<std::string, std::vector<Event *> >::iterator itw = trace->allWriteSet.begin(),
+				iew = trace->allWriteSet.end();
+		unsigned cntW = 0;
+		for (; itw != iew; itw++) {
+			cntW += itw->second.size();
+		}
+	std::cerr << "size = " << cntW << endl;
 
 #if PRINT_OPERATION_SET_DETAILED
 	std::cout << "print readSet(detailed):" << std::endl;
@@ -88,17 +106,17 @@ void DefUseBuilder::buildDefUseForCurPath() {
 
 	printSingleThreadEvent();
 
-	assert(trace->readSet.size() != 0 && "readSet is empty");
+	assert(trace->allReadSet.size() != 0 && "readSet is empty");
 	markLatestWriteForGlobalVar();
 //	reduceSet(trace->readSet);
 //	reduceSet(trace->writeSet);
 
 	Event* firPthCreEvent = getFirstPthreadCreateEvent();
-	std::map<string, vector<Event *> >::iterator rsIte = trace->readSet.begin(); //key--variable
-	for (; rsIte != trace->readSet.end(); ++rsIte) {
-		map<string, vector<Event *> >::iterator wsIte = trace->writeSet.find(rsIte->first);
+	std::map<string, vector<Event *> >::iterator rsIte = trace->allReadSet.begin(); //key--variable
+	for (; rsIte != trace->allReadSet.end(); ++rsIte) {
+		map<string, vector<Event *> >::iterator wsIte = trace->allWriteSet.find(rsIte->first);
 //		assert(iw != trace->writeSet.end());
-		if(wsIte == trace->writeSet.end())
+		if(wsIte == trace->allWriteSet.end())
 			continue;
 		if(find(singleThreadEvent.begin(), singleThreadEvent.end(), rsIte->first) != singleThreadEvent.end())
 			continue;
@@ -121,20 +139,22 @@ void DefUseBuilder::buildDefUseForCurPath() {
 			 */
 				//read from initialization
 				curWrite = NULL;
-				if(curWrite != getLatestWriteInCurPath(curRead, wsIte))
-					buildAndVerifyDefUse(curRead, curWrite, wsIte);
-				else
+				if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){
 					buildDefUse(curRead, curWrite, wsIte);
+				} else{
+					buildAndVerifyDefUse(curRead, curWrite, wsIte);;
+				}
 
 				//read from other thread
 				for(unsigned l = 0; l < wsIte->second.size(); ++l){
 					if(curRead->threadId == wsIte->second[l]->threadId)
 						continue;
 					curWrite = wsIte->second[l];
-					if(curWrite != getLatestWriteInCurPath(curRead, wsIte))
-						buildAndVerifyDefUse(curRead, curWrite, wsIte);
-					else
+					if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){
 						buildDefUse(curRead, curWrite, wsIte);
+					} else{
+						buildAndVerifyDefUse(curRead, curWrite, wsIte);
+					}
 				}
 			} else {
 			/*
@@ -143,22 +163,17 @@ void DefUseBuilder::buildDefUseForCurPath() {
 			 */
 				for (unsigned l = 0; l < wsIte->second.size(); ++l) {
 					curWrite = wsIte->second[l];
-					if (curRead->threadId == curWrite->threadId && curRead->latestWrite != curWrite)  //can't read
-					{
-//						std::cout << "marked for test!" << std::endl;
-						continue;
-					}
-					//reduce def-use chain which has been covered by current path.
-					if(curWrite == curRead->latestWrite){
-//						std::cout << "reduce marked type->2" << std::endl;
+					if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){	//explicit def-use
 						buildDefUse(curRead, curWrite, wsIte);
-						continue;
+					} else{ 													//implicit def-use
+						if(curRead->threadId == curWrite->threadId){ 			///read from the same thread
+							if(curRead->latestWrite == curWrite){
+								buildAndVerifyDefUse(curRead, curWrite, wsIte); ///read from latestWrite
+							}
+						} else{ 												///read from other threads
+							buildAndVerifyDefUse(curRead, curWrite, wsIte);
+						}
 					}
-
-					if(curWrite != getLatestWriteInCurPath(curRead, wsIte))
-						buildAndVerifyDefUse(curRead, curWrite, wsIte);
-					else
-						buildDefUse(curRead, curWrite, wsIte);
 				}
 			}
 		}
@@ -171,14 +186,38 @@ void DefUseBuilder::buildAndVerifyDefUse(Event* curRead, Event* curWrite,
 	def_use->pre = curWrite;
 	def_use->post = curRead;
 	if(!isCoveredPrePath(def_use)){
-		rdManager.coveredDefUse_pre.push_back(def_use);
 		expr defUseExpr = encode.z3_ctx.int_const("E_INIT");
-		buildExpr(curRead, curWrite, iw, defUseExpr);
-		if(isValid(defUseExpr))
-			std::cout << "the constraint can be solved!" << std::endl;
-		else ;
-//			std::cout << "the constraint can not be solved!" << std::endl;
+		buildExpr(curRead, curWrite, defUseExpr);
+		if(isValid(curRead, curWrite, defUseExpr)) {
+			rdManager.coveredDefUse_pre.push_back(def_use);
+			rdManager.implicitDefUse_pre.push_back(def_use);
+			removeFromUnsolved(def_use);
+#if DELETE_MP_DU
+			if (curWrite != NULL) {
+				std::string bbName1 = curWrite->inst->inst->getParent()->getParent()->getName().str() + "." +
+						curWrite->inst->inst->getParent()->getName().str();
+				std::string bbName2 = curRead->inst->inst->getParent()->getParent()->getName().str() + "." +
+						curRead->inst->inst->getParent()->getName().str();
+
+				for (std::multimap<std::string, std::string>::iterator it = rdManager.MP.begin(),
+						ie = rdManager.MP.end(); it != ie; it++) {
+					if (it->first == bbName1 && it->second == bbName2) {
+						rdManager.MP.erase(it);
+					}
+				}
+			}
+#endif
+			std::cerr << "the constraint can be solved!" << std::endl;
+			return ;
+		} else {
+			if(!isUnsolvedPrePath(def_use)){
+				rdManager.unsolvedDefUse_pre.push_back(def_use);
+				return ;
+			}
+		}
 	}
+	delete def_use;
+	return ;
 }
 
 void DefUseBuilder::buildDefUse(Event* curRead, Event* curWrite,
@@ -186,14 +225,91 @@ void DefUseBuilder::buildDefUse(Event* curRead, Event* curWrite,
 	DefUse* def_use = new DefUse;
 	def_use->pre = curWrite;
 	def_use->post = curRead;
-	if(!isCoveredPrePath(def_use)){
-		rdManager.coveredDefUse_pre.push_back(def_use);
+	if(!isCoveredExplicit(def_use)){
+		rdManager.explicitDefUse_pre.push_back(def_use);
+#if DELETE_MP_DU
+		if (curWrite != NULL) {
+			std::string bbName1 = curWrite->inst->inst->getParent()->getParent()->getName().str() + "." +
+					curWrite->inst->inst->getParent()->getName().str();
+			std::string bbName2 = curRead->inst->inst->getParent()->getParent()->getName().str() + "." +
+					curRead->inst->inst->getParent()->getName().str();
+
+			for (std::multimap<std::string, std::string>::iterator it = rdManager.MP.begin(),
+					ie = rdManager.MP.end(); it != ie; it++) {
+				if (it->first == bbName1 && it->second == bbName2) {
+					rdManager.MP.erase(it);
+				}
+			}
+		}
+#endif
 //		std::cout << "just build" << std::endl;
+		if(!isCoveredPrePath(def_use)){
+			rdManager.coveredDefUse_pre.push_back(def_use);
+			return ;
+		}
+		return ;
+	}
+	delete def_use;
+	return ;
+}
+
+
+void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
+								expr& defUseExpr) {
+
+	if(curWrite == NULL){ //read from initialization
+		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
+		defUseExpr = (defUseExpr < curReadExpr);
+
+#if PRINT_DEF_USE
+		std::cout << "def_use_order_type1" << std::endl;
+		std::cout << def_use_order_tpye1 << std::endl;
+		std::cout << currentRead->toString() << std::endl;
+#endif
+
+	} else{					//read from other thread
+		expr curWriteExpr = encode.z3_ctx.int_const(curWrite->eventName.c_str());
+		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
+
+		Event*  curWriteNext = getNextEventInThread(curWrite);
+		Event* curReadPrev = getPrevEventInThread(curRead);
+		expr curWriteNextExpr = encode.z3_ctx.int_const(curWriteNext->eventName.c_str());
+		expr curReadPrevExpr = encode.z3_ctx.int_const(curReadPrev->eventName.c_str());
+
+		assert((curWriteNext != curWrite || curReadPrev != curRead) && "trace error!");
+		if(curWriteNext != curWrite && curReadPrev != curRead){
+			if(curWriteNext == NULL){
+				if(curReadPrev == NULL){
+					defUseExpr = (curWriteExpr < curReadExpr);
+				} else{
+					defUseExpr = (curWriteExpr < curReadExpr) &&
+									(curReadPrevExpr < curWriteExpr);
+				}
+			} else {
+				if(curRead == NULL){
+					defUseExpr = (curWriteExpr < curReadExpr)&&
+									(curReadExpr < curWriteNextExpr);
+				} else{
+					defUseExpr = (curWriteExpr < curReadExpr)&&
+									(curReadPrevExpr < curWriteExpr) &&
+									(curReadExpr < curWriteNextExpr);
+				}
+			}
+		}
+
+#if PRINT_DEF_USE
+		std::cout << "def_use_order_type2" << std::endl;
+		std::cout << def_use_order_type2 << std::endl;
+		std::cout << currentRead->toString() << std::endl;
+		std::cout << currentWrite->toString() << std::endl;
+#endif
+
 	}
 
 }
 
-void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
+
+void DefUseBuilder::buildExpr_AddAllWrite(Event* curRead, Event* curWrite,
 								map<string, vector<Event *> >::iterator iw,
 								expr& defUseExpr) {
 
@@ -236,21 +352,71 @@ void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
 
 }
 
-bool DefUseBuilder::isCoveredPrePath(DefUse* defUse){
-	std::vector<DefUse*>::iterator duIte = rdManager.coveredDefUse_pre.begin();
-	std::vector<DefUse*>::iterator duEndIte = rdManager.coveredDefUse_pre.end();;
+Event* DefUseBuilder::getPrevEventInThread(Event* curEvent){
+	std::vector<std::vector<Event*>*>::iterator ite = trace->eventList.begin();
+	std::vector<std::vector<Event*>*>::iterator iteEnd = trace->eventList.end();
+	for( ; ite != iteEnd; ++ite){
+		if((*ite) == NULL)
+			continue ;
+		if((*ite)->front()->threadId == curEvent->threadId){
+			unsigned length = (*ite)->size();
+			for(unsigned i = 0; i < length; ++i){
+				if((*ite)->at(i) == curEvent){
+					if(i == 0){
+						return NULL;
+					} else{
+						return (*ite)->at(i - 1);
+					}
+				}
+			}
+		}
+	}
+	return curEvent;
+}
+
+Event* DefUseBuilder::getNextEventInThread(Event* curEvent){
+	std::vector<std::vector<Event*>*>::iterator ite = trace->eventList.begin();
+	std::vector<std::vector<Event*>*>::iterator iteEnd = trace->eventList.end();
+	for( ; ite != iteEnd; ++ite){
+		if((*ite) == NULL)
+			continue ;
+		if((*ite)->front()->threadId == curEvent->threadId){
+			unsigned length = (*ite)->size();
+			for(unsigned i = 0; i < length; ++i){
+				if((*ite)->at(i) == curEvent){
+					if(i == length - 1){
+						return NULL;
+					} else{
+						return (*ite)->at(i + 1);
+					}
+				}
+			}
+		}
+	}
+	return curEvent;
+}
+
+bool DefUseBuilder::isCoveredOrUnsolved(DefUse* defUse, std::vector<DefUse*>& vecSrc){
+	std::vector<DefUse*>::iterator duIte = vecSrc.begin();
+	std::vector<DefUse*>::iterator duEndIte = vecSrc.end();;
 	while(duIte != duEndIte){
 		if(defUse->pre == NULL){
 			if((*duIte)->pre == NULL)
-				if((*duIte)->post->inst->info->assemblyLine
-						== defUse->post->inst->info->assemblyLine)
+				if((*duIte)->post->inst->info->assemblyLine ==
+					defUse->post->inst->info->assemblyLine  &&
+						(*duIte)->post->threadId ==
+						defUse->post->threadId )
 					return true;
 		} else{
 			if((*duIte)->pre != NULL)
-				if((*duIte)->pre->inst->info->assemblyLine
-						== defUse->pre->inst->info->assemblyLine
-						&& (*duIte)->post->inst->info->assemblyLine
-						== defUse->post->inst->info->assemblyLine)
+				if((*duIte)->pre->inst->info->assemblyLine ==
+					defUse->pre->inst->info->assemblyLine &&
+						 (*duIte)->post->inst->info->assemblyLine ==
+						 defUse->post->inst->info->assemblyLine  &&
+						 	(*duIte)->pre->threadId ==
+						 	defUse->pre->threadId &&
+						 		(*duIte)->post->threadId ==
+						 		defUse->post->threadId)
 					return true;
 		}
 		++duIte;
@@ -258,24 +424,86 @@ bool DefUseBuilder::isCoveredPrePath(DefUse* defUse){
 	return false;
 }
 
+bool DefUseBuilder::isCoveredPrePath(DefUse* defUse){
+	return isCoveredOrUnsolved(defUse, rdManager.coveredDefUse_pre);
+}
 
-bool DefUseBuilder::isValid(const expr& defUseExpr){
+bool DefUseBuilder::isUnsolvedPrePath(DefUse* defUse){
+	return isCoveredOrUnsolved(defUse, rdManager.unsolvedDefUse_pre);
+}
 
-	encode.z3_solver.push();
-	encode.z3_solver.add(defUseExpr);
+bool DefUseBuilder::isCoveredExplicit(DefUse* defUse){
+	return isCoveredOrUnsolved(defUse, rdManager.explicitDefUse_pre);
+}
+
+void DefUseBuilder::removeFromUnsolved(DefUse* defUse){
+	std::vector<DefUse*>::iterator duIte = rdManager.unsolvedDefUse_pre.begin();
+	std::vector<DefUse*>::iterator duEndIte = rdManager.unsolvedDefUse_pre.end();;
+	while(duIte != duEndIte){
+		if(defUse->pre == NULL){
+			if((*duIte)->pre == NULL)
+				if((*duIte)->post->inst->info->assemblyLine ==
+					defUse->post->inst->info->assemblyLine  &&
+						(*duIte)->post->threadId ==
+						defUse->post->threadId ){
+					rdManager.unsolvedDefUse_pre.erase(duIte);
+					return ;
+				}
+		} else{
+			if((*duIte)->pre != NULL)
+				if((*duIte)->pre->inst->info->assemblyLine ==
+					defUse->pre->inst->info->assemblyLine &&
+						 (*duIte)->post->inst->info->assemblyLine ==
+						 defUse->post->inst->info->assemblyLine &&
+						 	(*duIte)->pre->threadId ==
+						 	defUse->pre->threadId &&
+						 		(*duIte)->post->threadId ==
+						 		defUse->post->threadId ){
+					rdManager.unsolvedDefUse_pre.erase(duIte);
+					return ;
+				}
+		}
+		++duIte;
+	}
+	return ;
+}
+
+bool DefUseBuilder::isValid(Event* curRead, Event* curWrite, const expr& defUseExpr){
+//	std::cout << defUseExpr << std::endl;
+
+	encode.z3_solver_du.push();
+	encode.z3_solver_du.add(defUseExpr);
+
+	addIfFormula(curRead);
+	if (curWrite != NULL)
+		addIfFormula(curWrite);
 
 	try {
-		if(z3::sat == encode.z3_solver.check()){
-			std::cout << defUseExpr << std::endl;
-			encode.z3_solver.pop();
+		if(z3::sat == encode.z3_solver_du.check()){
+			encode.z3_solver_du.pop();
 			return true;
 		}
 	} catch (z3::exception & ex) {
 		std::cout << "\n unexpected error: " << ex << std::endl;
 	}
 
-	encode.z3_solver.pop();
+	encode.z3_solver_du.pop();
 	return false;
+}
+
+void DefUseBuilder::addIfFormula(Event* curEvent) {
+	for (unsigned j = 0; j < encode.ifFormula.size(); j++) {
+		Event* temp = encode.ifFormula[j].first;
+		expr currIf = encode.z3_ctx.int_const(curEvent->eventName.c_str());
+		expr tempIf = encode.z3_ctx.int_const(temp->eventName.c_str());
+		expr constraint = encode.z3_ctx.bool_val(1);
+		if (curEvent->threadId == temp->threadId) {
+			if (curEvent->eventId > temp->eventId)
+				constraint = encode.ifFormula[j].second;
+		} else
+			constraint = implies(tempIf < currIf, encode.ifFormula[j].second);
+		encode.z3_solver_du.add(constraint);
+	}
 }
 
 void DefUseBuilder::markLatestWriteForGlobalVar() { 		//called by buildReadWriteFormula
@@ -339,12 +567,12 @@ void DefUseBuilder::markLatestWriteForGlobalVar() { 		//called by buildReadWrite
 
 void DefUseBuilder::markLatestReadOrWriteForGlobalVar() { //called by buildReadWriteFormula
 	std::cout << "create latest read and write!" << std::endl;
-	std::map<string, std::vector<Event*> >::iterator iread = trace->readSet.begin();
+	std::map<string, std::vector<Event*> >::iterator iread = trace->allReadSet.begin();
 	std::map<string, std::vector<Event*> >::iterator iwrite;
 
-	while(iread != trace->readSet.end()) {
-		iwrite = trace->writeSet.find(iread->first);
-		if(iwrite == trace->writeSet.end()){
+	while(iread != trace->allReadSet.end()) {
+		iwrite = trace->allWriteSet.find(iread->first);
+		if(iwrite == trace->allWriteSet.end()){
 			++iread;
 			continue;
 		}
@@ -453,7 +681,8 @@ void DefUseBuilder::reduceSet(std::map<std::string, std::vector<Event *> >& sour
 		while(eventIt != it->second.end()) {
 			std::vector<Event *>::iterator tmpIt = eventIt + 1;
 			while(tmpIt != it->second.end()) {
-				if((*eventIt)->inst->info->id == (*tmpIt)->inst->info->id) {
+				if(((*eventIt)->inst->info->assemblyLine == (*tmpIt)->inst->info->assemblyLine) &&
+					((*eventIt)->threadId == (*tmpIt)->threadId)) {
 					tmpIt = it->second.erase(tmpIt);
 				} else {
 					tmpIt++;
@@ -474,12 +703,12 @@ void DefUseBuilder::selectCRSet(std::vector<expr>& sourceSet){
 	while (it != sourceSet.end()) {
 	//	std::cout << "the Def-Use constraint:" << std::endl;
 	//	std::cout << *it << "\n" << std::endl;
-		encode.z3_solver.push();
-		encode.z3_solver.add(*it);
+		encode.z3_solver_du.push();
+		encode.z3_solver_du.add(*it);
 
 		check_result result;
 		try {
-			result = encode.z3_solver.check();
+			result = encode.z3_solver_du.check();
 		} catch (z3::exception& ex) {
 			std::cout << "\n unexpected error: " << ex << std::endl;
 			continue;
@@ -491,7 +720,7 @@ void DefUseBuilder::selectCRSet(std::vector<expr>& sourceSet){
 		}else{
 			it = sourceSet.erase(it);
 			++cnt;
-			encode.z3_solver.pop();
+			encode.z3_solver_du.pop();
 		}
 	}
 	std::cout << "delete " << cnt << "CR, all done" << std::endl;
@@ -513,11 +742,11 @@ Event* DefUseBuilder::getFirstPthreadCreateEvent(){
 
 void DefUseBuilder::printSingleThreadEvent(){
 	std::map<std::string, std::vector<Event*> >::iterator imb, ime;
-	for(imb = trace->readSet.begin(),
-			ime = trace->readSet.end(); imb != ime; ++imb){
+	for(imb = trace->allReadSet.begin(),
+			ime = trace->allReadSet.end(); imb != ime; ++imb){
 		std::map<std::string, std::vector<Event*> >::iterator iw;
-		iw = trace->writeSet.find((*imb).first);
-		if(iw == trace->writeSet.end())
+		iw = trace->allWriteSet.find((*imb).first);
+		if(iw == trace->allWriteSet.end())
 			continue;
 
 //		std::cout << "print single thread event!" << (*imb).first << std::endl;
