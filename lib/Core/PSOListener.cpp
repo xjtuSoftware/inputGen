@@ -148,7 +148,7 @@ void PSOListener::beforeRunMethodAsMain(ExecutionState &initialState) {
 void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 	Trace* trace = rdManager->getCurrentTrace();
 	Instruction* inst = ki->inst;
-	inst->dump();
+//	inst->dump();
 	std::string bbFullName = inst->getParent()->getParent()->getName().str() +
 			"." + inst->getParent()->getName().str();
 	std::map<llvm::BasicBlock*, std::set<std::string> >::iterator bbIt =
@@ -744,7 +744,7 @@ void PSOListener::executeInstruction(ExecutionState &state, KInstruction *ki) {
 					}
 					item->globalVarFullName = varFullName;
 					item->varName = varName;
-					cerr << varName << "\n";
+//					cerr << varName << "\n";
 #if PTR
 					if (item->isGlobal) {
 #else

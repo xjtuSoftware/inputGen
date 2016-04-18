@@ -327,10 +327,10 @@ void InputGenListener::instructionExecuted(ExecutionState &state, KInstruction *
 void InputGenListener::afterRunMethodAsMain() {
 //	std::cerr << "print the symbolic tree to debug.\n";
 //
-	if (executor->headSentinel != NULL) {
-		Executor::BinTree * head = executor->headSentinel;
-		printSymbolicNode(head);
-	}
+//	if (executor->headSentinel != NULL) {
+//		Executor::BinTree * head = executor->headSentinel;
+//		printSymbolicNode(head);
+//	}
 
 //	std::cerr << "input generate calling start.\n";
 	inputGen(InputGenListener::DFS);
@@ -585,9 +585,9 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 			assert(curr->isConditionIns);
 			BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
 			temp->vecExpr[0]->dump();
-			bi->dump();
-			std::cerr << "curr true : " << curr->inst->trueBT <<
-					", curr false : " << curr->inst->falseBT << endl;
+//			bi->dump();
+//			std::cerr << "curr true : " << curr->inst->trueBT <<
+//					", curr false : " << curr->inst->falseBT << endl;
 			if (temp->brTrue) {
 
 				if (curr->inst->falseBT == KInstruction::possible &&

@@ -140,6 +140,8 @@ void DefUseBuilder::buildDefUseForCurPath() {
 				//read from initialization
 				curWrite = NULL;
 				if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){
+					std::cerr << "truly happen" << std::endl;
+					buildAndVerifyDefUse(curRead, curWrite, wsIte);
 					buildDefUse(curRead, curWrite, wsIte);
 				} else{
 					buildAndVerifyDefUse(curRead, curWrite, wsIte);;
@@ -151,6 +153,7 @@ void DefUseBuilder::buildDefUseForCurPath() {
 						continue;
 					curWrite = wsIte->second[l];
 					if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){
+						std::cerr << "truly happen" << std::endl;
 						buildDefUse(curRead, curWrite, wsIte);
 					} else{
 						buildAndVerifyDefUse(curRead, curWrite, wsIte);
@@ -164,6 +167,7 @@ void DefUseBuilder::buildDefUseForCurPath() {
 				for (unsigned l = 0; l < wsIte->second.size(); ++l) {
 					curWrite = wsIte->second[l];
 					if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){	//explicit def-use
+						std::cerr << "truly happen" << std::endl;
 						buildDefUse(curRead, curWrite, wsIte);
 					} else{ 													//implicit def-use
 						if(curRead->threadId == curWrite->threadId){ 			///read from the same thread
@@ -186,8 +190,10 @@ void DefUseBuilder::buildAndVerifyDefUse(Event* curRead, Event* curWrite,
 	def_use->pre = curWrite;
 	def_use->post = curRead;
 	if(!isCoveredPrePath(def_use)){
+		std::cerr << "not added now" << std::endl;
 		expr defUseExpr = encode.z3_ctx.int_const("E_INIT");
-		buildExpr(curRead, curWrite, defUseExpr);
+//		buildExpr(curRead, curWrite, defUseExpr);
+		buildExpr_AddAllWrite(curRead, curWrite, iw, defUseExpr);
 		if(isValid(curRead, curWrite, defUseExpr)) {
 			rdManager.coveredDefUse_pre.push_back(def_use);
 			rdManager.implicitDefUse_pre.push_back(def_use);
@@ -271,6 +277,8 @@ void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
 		expr curWriteExpr = encode.z3_ctx.int_const(curWrite->eventName.c_str());
 		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
 
+		std::cerr << "read name : " << curRead->globalVarFullName << ", write name : " <<
+				curWrite->globalVarFullName << endl;
 		Event*  curWriteNext = getNextEventInThread(curWrite);
 		Event* curReadPrev = getPrevEventInThread(curRead);
 		expr curWriteNextExpr = encode.z3_ctx.int_const(curWriteNext->eventName.c_str());
@@ -317,9 +325,11 @@ void DefUseBuilder::buildExpr_AddAllWrite(Event* curRead, Event* curWrite,
 		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
 		defUseExpr = (defUseExpr < curReadExpr);
 
+		std::cerr << "read from init, read name: " << curRead->varName << std::endl;
 		for (unsigned l = 0; l < iw->second.size(); ++l) {
 			if (curRead->threadId == iw->second[l]->threadId) //can't read
 					continue;
+			std::cerr << "write name: " << iw->second[l]->varName << std::endl;
 			expr otherWriteExpr = encode.z3_ctx.int_const(
 								iw->second[l]->eventName.c_str());
 			defUseExpr = defUseExpr && (curReadExpr < otherWriteExpr);
@@ -331,11 +341,14 @@ void DefUseBuilder::buildExpr_AddAllWrite(Event* curRead, Event* curWrite,
 #endif
 
 	} else{					//read from other thread
+		std::cerr << "read from other : " << curRead->varName << std::endl;
+		std::cerr << "write name: " << curWrite->varName << std::endl;
 		expr curWriteExpr = encode.z3_ctx.int_const(curWrite->eventName.c_str());
 		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
 		defUseExpr = (curWriteExpr < curReadExpr);
 		for(unsigned i = 0; i < iw->second.size(); ++i){
 			if(curWrite->inst->info->id != iw->second[i]->inst->info->id){
+				std::cerr << "write name: " << iw->second[i]->varName << std::endl;
 				expr otherWriteExpr = encode.z3_ctx.int_const(iw->second[i]->eventName.c_str());
 				defUseExpr = defUseExpr
 						&& ((otherWriteExpr < curWriteExpr) || (curReadExpr < otherWriteExpr));
@@ -403,20 +416,22 @@ bool DefUseBuilder::isCoveredOrUnsolved(DefUse* defUse, std::vector<DefUse*>& ve
 		if(defUse->pre == NULL){
 			if((*duIte)->pre == NULL)
 				if((*duIte)->post->inst->info->assemblyLine ==
-					defUse->post->inst->info->assemblyLine  &&
+					defUse->post->inst->info->assemblyLine
+						/*&&
 						(*duIte)->post->threadId ==
-						defUse->post->threadId )
+						defUse->post->threadId  */)
 					return true;
 		} else{
 			if((*duIte)->pre != NULL)
 				if((*duIte)->pre->inst->info->assemblyLine ==
 					defUse->pre->inst->info->assemblyLine &&
 						 (*duIte)->post->inst->info->assemblyLine ==
-						 defUse->post->inst->info->assemblyLine  &&
+						 defUse->post->inst->info->assemblyLine
+						 	 /*&&
 						 	(*duIte)->pre->threadId ==
 						 	defUse->pre->threadId &&
 						 		(*duIte)->post->threadId ==
-						 		defUse->post->threadId)
+						 		defUse->post->threadId */)
 					return true;
 		}
 		++duIte;
@@ -443,9 +458,11 @@ void DefUseBuilder::removeFromUnsolved(DefUse* defUse){
 		if(defUse->pre == NULL){
 			if((*duIte)->pre == NULL)
 				if((*duIte)->post->inst->info->assemblyLine ==
-					defUse->post->inst->info->assemblyLine  &&
+					defUse->post->inst->info->assemblyLine
+						/*&&
 						(*duIte)->post->threadId ==
-						defUse->post->threadId ){
+						defUse->post->threadId
+						*/ ){
 					rdManager.unsolvedDefUse_pre.erase(duIte);
 					return ;
 				}
@@ -454,11 +471,14 @@ void DefUseBuilder::removeFromUnsolved(DefUse* defUse){
 				if((*duIte)->pre->inst->info->assemblyLine ==
 					defUse->pre->inst->info->assemblyLine &&
 						 (*duIte)->post->inst->info->assemblyLine ==
-						 defUse->post->inst->info->assemblyLine &&
+						 defUse->post->inst->info->assemblyLine
+						 	 /*
+						 	 &&
 						 	(*duIte)->pre->threadId ==
 						 	defUse->pre->threadId &&
 						 		(*duIte)->post->threadId ==
-						 		defUse->post->threadId ){
+						 		defUse->post->threadId
+							*/ ){
 					rdManager.unsolvedDefUse_pre.erase(duIte);
 					return ;
 				}
@@ -474,14 +494,26 @@ bool DefUseBuilder::isValid(Event* curRead, Event* curWrite, const expr& defUseE
 	encode.z3_solver_du.push();
 	encode.z3_solver_du.add(defUseExpr);
 
+//	std::cerr << defUseExpr << endl;
+//	if(z3::sat == encode.z3_solver_du.check()){
+//		std::cerr << "can solver" << endl;
+//	} else if (z3::unsat == encode.z3_solver_du.check()) {
+//		std::cerr << "unsat base constraints" << endl;
+//	}
+
 	addIfFormula(curRead);
 	if (curWrite != NULL)
 		addIfFormula(curWrite);
 
 	try {
 		if(z3::sat == encode.z3_solver_du.check()){
+			std::cerr << "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" << std::endl;
 			encode.z3_solver_du.pop();
 			return true;
+		}
+		else if (z3::unsat == encode.z3_solver_du.check()) {
+//			std::cerr << encode.z3_solver_du << endl;
+			std::cerr << "unsat constraints" << endl;
 		}
 	} catch (z3::exception & ex) {
 		std::cout << "\n unexpected error: " << ex << std::endl;
@@ -502,6 +534,7 @@ void DefUseBuilder::addIfFormula(Event* curEvent) {
 				constraint = encode.ifFormula[j].second;
 		} else
 			constraint = implies(tempIf < currIf, encode.ifFormula[j].second);
+
 		encode.z3_solver_du.add(constraint);
 	}
 }
