@@ -59,6 +59,8 @@ private:
 	void removeFromUnsolved(DefUse*);
 	bool isValid(Event*, Event*, const expr&);
 	void addIfFormula(Event*);
+	void printDefUse(DefUse* def_use);
+	void printDefUse_ss(DefUse*);
 
 	void markLatestWriteForGlobalVar();
 	void markLatestReadOrWriteForGlobalVar();

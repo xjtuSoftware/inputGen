@@ -584,7 +584,7 @@ void InputGenListener::negateBranchForDefUse(Executor::BinTree *head, bool flag)
 			Event *curr = temp->currEvent;
 			assert(curr->isConditionIns);
 			BranchInst *bi = dyn_cast<BranchInst>(curr->inst->inst);
-			temp->vecExpr[0]->dump();
+//			temp->vecExpr[0]->dump();
 //			bi->dump();
 //			std::cerr << "curr true : " << curr->inst->trueBT <<
 //					", curr false : " << curr->inst->falseBT << endl;
@@ -808,7 +808,7 @@ void InputGenListener::getSolveResult(std::vector<ref<Expr> >&
 			sr << m.eval(realExpr);
 //			std::cerr << "sr = " << sr.str().c_str() << std::endl;
 			int temp = atoi(sr.str().c_str());
-			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
+//			std::cerr << "var = " << iit->first << ", value = " << temp << std::endl;
 			rdManager->intArgv[iit->first] = (unsigned)temp;
 			sr.str("");
 		}

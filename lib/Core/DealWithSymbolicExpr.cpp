@@ -285,24 +285,24 @@ void DealWithSymbolicExpr::filterUseless(Trace* trace) {
 	}
 #endif
 
-	std::cerr << "source read set size:" << trace->readSet.size() << std::endl;
-	std::map<std::string, std::vector<Event *> >::iterator itr = trace->readSet.begin(),
-			ier = trace->readSet.end();
-	unsigned cntR = 0;
-	for (; itr != ier; itr++) {
-		std::cerr << "var Name : " << itr->first << std::endl;
-		cntR += itr->second.size();
-	}
-	std::cerr << "size = " << cntR << std::endl;
-	std::cout << "source write set size:" << trace->writeSet.size() << std::endl;
-	std::map<std::string, std::vector<Event *> >::iterator itw = trace->writeSet.begin(),
-				iew = trace->writeSet.end();
-		unsigned cntW = 0;
-		for (; itw != iew; itw++) {
-			std::cerr << "var Name : " << itw->first << std::endl;
-			cntW += itw->second.size();
-		}
-	std::cerr << "size = " << cntW << std::endl;
+//	std::cerr << "source read set size:" << trace->readSet.size() << std::endl;
+//	std::map<std::string, std::vector<Event *> >::iterator itr = trace->readSet.begin(),
+//			ier = trace->readSet.end();
+//	unsigned cntR = 0;
+//	for (; itr != ier; itr++) {
+//		std::cerr << "var Name : " << itr->first << std::endl;
+//		cntR += itr->second.size();
+//	}
+//	std::cerr << "size = " << cntR << std::endl;
+//	std::cout << "source write set size:" << trace->writeSet.size() << std::endl;
+//	std::map<std::string, std::vector<Event *> >::iterator itw = trace->writeSet.begin(),
+//				iew = trace->writeSet.end();
+//		unsigned cntW = 0;
+//		for (; itw != iew; itw++) {
+//			std::cerr << "var Name : " << itw->first << std::endl;
+//			cntW += itw->second.size();
+//		}
+//	std::cerr << "size = " << cntW << std::endl;
 
 
 	std::map<std::string, long> &varThread = trace->varThread;

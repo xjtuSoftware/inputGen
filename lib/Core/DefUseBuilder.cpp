@@ -22,7 +22,7 @@ using namespace z3;
 #define PRINT_OPERATION_SET_DETAILED 0
 #define PRINT_OPERATION_SET_BRIEFLY 0
 #define PRINT_DEF_USE 0
-#define DELETE_MP_DU 0
+#define DELETE_MP_DU 1
 
 namespace klee {
 
@@ -140,8 +140,7 @@ void DefUseBuilder::buildDefUseForCurPath() {
 				//read from initialization
 				curWrite = NULL;
 				if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){
-					std::cerr << "truly happen" << std::endl;
-					buildAndVerifyDefUse(curRead, curWrite, wsIte);
+//					std::cerr << "truly happen 1" << std::endl;
 					buildDefUse(curRead, curWrite, wsIte);
 				} else{
 					buildAndVerifyDefUse(curRead, curWrite, wsIte);;
@@ -153,7 +152,7 @@ void DefUseBuilder::buildDefUseForCurPath() {
 						continue;
 					curWrite = wsIte->second[l];
 					if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){
-						std::cerr << "truly happen" << std::endl;
+//						std::cerr << "truly happen 2" << std::endl;
 						buildDefUse(curRead, curWrite, wsIte);
 					} else{
 						buildAndVerifyDefUse(curRead, curWrite, wsIte);
@@ -167,7 +166,7 @@ void DefUseBuilder::buildDefUseForCurPath() {
 				for (unsigned l = 0; l < wsIte->second.size(); ++l) {
 					curWrite = wsIte->second[l];
 					if(curWrite == getLatestWriteInCurPath(curRead, wsIte)){	//explicit def-use
-						std::cerr << "truly happen" << std::endl;
+//						std::cerr << "truly happen 3" << std::endl;
 						buildDefUse(curRead, curWrite, wsIte);
 					} else{ 													//implicit def-use
 						if(curRead->threadId == curWrite->threadId){ 			///read from the same thread
@@ -190,10 +189,11 @@ void DefUseBuilder::buildAndVerifyDefUse(Event* curRead, Event* curWrite,
 	def_use->pre = curWrite;
 	def_use->post = curRead;
 	if(!isCoveredPrePath(def_use)){
-		std::cerr << "not added now" << std::endl;
+//		std::cerr << "not added now" << std::endl;
 		expr defUseExpr = encode.z3_ctx.int_const("E_INIT");
 //		buildExpr(curRead, curWrite, defUseExpr);
 		buildExpr_AddAllWrite(curRead, curWrite, iw, defUseExpr);
+//		printDefUse(def_use);
 		if(isValid(curRead, curWrite, defUseExpr)) {
 			rdManager.coveredDefUse_pre.push_back(def_use);
 			rdManager.implicitDefUse_pre.push_back(def_use);
@@ -213,9 +213,10 @@ void DefUseBuilder::buildAndVerifyDefUse(Event* curRead, Event* curWrite,
 				}
 			}
 #endif
-			std::cerr << "the constraint can be solved!" << std::endl;
+			std::cerr << "the constraint can be solved!\n" << std::endl;
 			return ;
 		} else {
+//			std::cerr << "the constraint can not be solved!\n" << std::endl;
 			if(!isUnsolvedPrePath(def_use)){
 				rdManager.unsolvedDefUse_pre.push_back(def_use);
 				return ;
@@ -259,6 +260,35 @@ void DefUseBuilder::buildDefUse(Event* curRead, Event* curWrite,
 	return ;
 }
 
+void DefUseBuilder::printDefUse_ss(DefUse *def_use) {
+	string ErrorInfo;
+	raw_fd_ostream out_to_file("./out_statics.txt", ErrorInfo, 0x0202);
+	stringstream ss;
+	if(def_use->pre != NULL){
+//		std::cout << def_use->pre->inst->info->assemblyLine << "->" << def_use->pre->threadId << ";";
+//		std::cout << def_use->post->inst->info->assemblyLine << "->" << def_use->post->threadId << std::endl;;
+//		std::cout << def_use->pre->toString();
+//		std::cout << def_use->post->toString();
+//		std::cout << std::endl;;
+
+		ss << def_use->pre->inst->info->line << "->" << def_use->post->inst->info->line << "; ";
+		ss << def_use->pre->threadId << "->" << def_use->post->threadId << std::endl;;
+		ss << "assemblyLine: " << def_use->pre->inst->info->assemblyLine << "->" <<
+				def_use->post->inst->info->assemblyLine << std::endl;
+		ss << def_use->pre->toString();
+		ss << def_use->post->toString();
+		ss << std::endl;;
+	} else{
+		ss << "NULL->" << def_use->post->inst->info->line << "; ";
+		ss << "NULL" << "->" << def_use->post->threadId << std::endl;;
+		ss << "assemblyLine: NULL->" << def_use->post->inst->info->assemblyLine << std::endl;;
+		ss << def_use->post->toString();
+		ss << std::endl;;
+	}
+	out_to_file << ss.str();
+	out_to_file.close();
+}
+
 
 void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
 								expr& defUseExpr) {
@@ -277,8 +307,8 @@ void DefUseBuilder::buildExpr(Event* curRead, Event* curWrite,
 		expr curWriteExpr = encode.z3_ctx.int_const(curWrite->eventName.c_str());
 		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
 
-		std::cerr << "read name : " << curRead->globalVarFullName << ", write name : " <<
-				curWrite->globalVarFullName << endl;
+//		std::cerr << "read name : " << curRead->globalVarFullName << ", write name : " <<
+//				curWrite->globalVarFullName << endl;
 		Event*  curWriteNext = getNextEventInThread(curWrite);
 		Event* curReadPrev = getPrevEventInThread(curRead);
 		expr curWriteNextExpr = encode.z3_ctx.int_const(curWriteNext->eventName.c_str());
@@ -325,11 +355,11 @@ void DefUseBuilder::buildExpr_AddAllWrite(Event* curRead, Event* curWrite,
 		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
 		defUseExpr = (defUseExpr < curReadExpr);
 
-		std::cerr << "read from init, read name: " << curRead->varName << std::endl;
+//		std::cerr << "read from init, read name: " << curRead->varName << std::endl;
 		for (unsigned l = 0; l < iw->second.size(); ++l) {
 			if (curRead->threadId == iw->second[l]->threadId) //can't read
 					continue;
-			std::cerr << "write name: " << iw->second[l]->varName << std::endl;
+//			std::cerr << "write name: " << iw->second[l]->varName << std::endl;
 			expr otherWriteExpr = encode.z3_ctx.int_const(
 								iw->second[l]->eventName.c_str());
 			defUseExpr = defUseExpr && (curReadExpr < otherWriteExpr);
@@ -341,14 +371,14 @@ void DefUseBuilder::buildExpr_AddAllWrite(Event* curRead, Event* curWrite,
 #endif
 
 	} else{					//read from other thread
-		std::cerr << "read from other : " << curRead->varName << std::endl;
-		std::cerr << "write name: " << curWrite->varName << std::endl;
+//		std::cerr << "read from other : " << curRead->varName << std::endl;
+//		std::cerr << "write name: " << curWrite->varName << std::endl;
 		expr curWriteExpr = encode.z3_ctx.int_const(curWrite->eventName.c_str());
 		expr curReadExpr = encode.z3_ctx.int_const(curRead->eventName.c_str());
 		defUseExpr = (curWriteExpr < curReadExpr);
 		for(unsigned i = 0; i < iw->second.size(); ++i){
 			if(curWrite->inst->info->id != iw->second[i]->inst->info->id){
-				std::cerr << "write name: " << iw->second[i]->varName << std::endl;
+//				std::cerr << "write name: " << iw->second[i]->varName << std::endl;
 				expr otherWriteExpr = encode.z3_ctx.int_const(iw->second[i]->eventName.c_str());
 				defUseExpr = defUseExpr
 						&& ((otherWriteExpr < curWriteExpr) || (curReadExpr < otherWriteExpr));
@@ -491,8 +521,21 @@ void DefUseBuilder::removeFromUnsolved(DefUse* defUse){
 bool DefUseBuilder::isValid(Event* curRead, Event* curWrite, const expr& defUseExpr){
 //	std::cout << defUseExpr << std::endl;
 
+//	if(z3::sat == encode.z3_solver_du.check()){
+//		std::cerr << "before can solver" << endl;
+//	} else if (z3::unsat == encode.z3_solver_du.check()) {
+//		std::cerr << "before unsat base constraints" << endl;
+//	}
+
+
 	encode.z3_solver_du.push();
 	encode.z3_solver_du.add(defUseExpr);
+
+
+
+	addIfFormula(curRead);
+	if (curWrite != NULL)
+		addIfFormula(curWrite);
 
 //	std::cerr << defUseExpr << endl;
 //	if(z3::sat == encode.z3_solver_du.check()){
@@ -501,20 +544,16 @@ bool DefUseBuilder::isValid(Event* curRead, Event* curWrite, const expr& defUseE
 //		std::cerr << "unsat base constraints" << endl;
 //	}
 
-	addIfFormula(curRead);
-	if (curWrite != NULL)
-		addIfFormula(curWrite);
-
 	try {
 		if(z3::sat == encode.z3_solver_du.check()){
-			std::cerr << "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" << std::endl;
+//			std::cerr << "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHH" << std::endl;
 			encode.z3_solver_du.pop();
 			return true;
 		}
-		else if (z3::unsat == encode.z3_solver_du.check()) {
-//			std::cerr << encode.z3_solver_du << endl;
-			std::cerr << "unsat constraints" << endl;
-		}
+//		else if (z3::unsat == encode.z3_solver_du.check()) {
+////			std::cerr << encode.z3_solver_du << endl;
+//			std::cerr << "unsat constraints" << endl;
+//		}
 	} catch (z3::exception & ex) {
 		std::cout << "\n unexpected error: " << ex << std::endl;
 	}
@@ -538,6 +577,32 @@ void DefUseBuilder::addIfFormula(Event* curEvent) {
 		encode.z3_solver_du.add(constraint);
 	}
 }
+
+
+void DefUseBuilder::printDefUse(DefUse* def_use){
+	if(def_use->pre != NULL){
+//		std::cout << def_use->pre->inst->info->assemblyLine << "->" << def_use->pre->threadId << ";";
+//		std::cout << def_use->post->inst->info->assemblyLine << "->" << def_use->post->threadId << std::endl;;
+//		std::cout << def_use->pre->toString();
+//		std::cout << def_use->post->toString();
+//		std::cout << std::endl;;
+
+		std::cout << def_use->pre->inst->info->line << "->" << def_use->post->inst->info->line << "; ";
+		std::cout << def_use->pre->threadId << "->" << def_use->post->threadId << std::endl;;
+		std::cout << "assemblyLine: " << def_use->pre->inst->info->assemblyLine << "->" <<
+				def_use->post->inst->info->assemblyLine << std::endl;
+		std::cout << def_use->pre->toString();
+		std::cout << def_use->post->toString();
+//		std::cout << std::endl;;
+	} else{
+		std::cout << "NULL->" << def_use->post->inst->info->line << "; ";
+		std::cout << "NULL" << "->" << def_use->post->threadId << std::endl;;
+		std::cout << "assemblyLine: NULL->" << def_use->post->inst->info->assemblyLine << std::endl;;
+		std::cout << def_use->post->toString();
+//		std::cout << std::endl;;
+	}
+}
+
 
 void DefUseBuilder::markLatestWriteForGlobalVar() { 		//called by buildReadWriteFormula
 	for (unsigned tid = 0; tid < trace->eventList.size(); tid++) {

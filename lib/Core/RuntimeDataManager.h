@@ -74,6 +74,7 @@ public:
 	std::map<std::string, llvm::BasicBlock*> ifBB;
 	std::map<llvm::BasicBlock*, std::set<std::string> > bbOpGVarName;
 	std::multimap<std::string, std::string> MP;
+	std::map<std::string, std::set<std::string> > waitingSet;
 	std::set<std::string> possibleBranch;
 
 	std::set<llvm::BasicBlock*> alreadyNegatedBB;

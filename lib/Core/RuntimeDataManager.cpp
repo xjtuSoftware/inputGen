@@ -44,12 +44,11 @@ RuntimeDataManager::RuntimeDataManager() :
 RuntimeDataManager::~RuntimeDataManager() {
 	// TODO Auto-generated destructor stub
 
-
 	string ErrorInfo;
 	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, 0x0202);
 	stringstream ss;
 	ss << "AllFormulaNum:" << allFormulaNum << "\n";
-	ss << "SovingTimes:" << solvingTimes << "\n";
+//	ss << "SovingTimes:" << solvingTimes << "\n";
 	ss << "TotalNewPath:" << testedTraceList.size() << "\n";
 	ss << "TotalOldPath:" << traceList.size() - testedTraceList.size() << "\n";
 	ss << "TotalPath:" << traceList.size() << "\n";
@@ -60,33 +59,33 @@ RuntimeDataManager::~RuntimeDataManager() {
 		ss << "allGlobal:0" << "\n";
 		ss << "brGlobal:0" << "\n";
 	}
-	if (testedTraceList.size()) {
-		ss << "AllBranch:" << ( satBranch + unSatBranch ) * 1.0 / testedTraceList.size() << "\n";
-		ss << "satBranch:" << satBranch * 1.0 / testedTraceList.size() << "\n";
-	} else {
-		ss << "AllBranch:0" << "\n";
-		ss << "satBranch:0" << "\n";
-	}
-	if (satBranch) {
-		ss << "satCost:" << satCost / satBranch << "\n";
-	} else {
-		ss << "satCost:0" << "\n";
-	}
-	if (testedTraceList.size()) {
-		ss << "unSatBranch:" << unSatBranch * 1.0 / testedTraceList.size()  << "\n";
-	} else {
-		ss << "unSatBranch:0" << "\n";
-	}
-	if (unSatBranch) {
-		ss << "unSatCost:" << unSatCost / unSatBranch << "\n";
-	} else {
-		ss << "unSatCost:0" << "\n";
-	}
-	if (testedTraceList.size()) {
-		ss << "uunSatBranch:" << uunSatBranch * 1.0 / testedTraceList.size()  << "\n";
-	} else {
-		ss << "uunSatBranch:0" << "\n";
-	}
+//	if (testedTraceList.size()) {
+//		ss << "AllBranch:" << ( satBranch + unSatBranch ) * 1.0 / testedTraceList.size() << "\n";
+//		ss << "satBranch:" << satBranch * 1.0 / testedTraceList.size() << "\n";
+//	} else {
+//		ss << "AllBranch:0" << "\n";
+//		ss << "satBranch:0" << "\n";
+//	}
+//	if (satBranch) {
+//		ss << "satCost:" << satCost / satBranch << "\n";
+//	} else {
+//		ss << "satCost:0" << "\n";
+//	}
+//	if (testedTraceList.size()) {
+//		ss << "unSatBranch:" << unSatBranch * 1.0 / testedTraceList.size()  << "\n";
+//	} else {
+//		ss << "unSatBranch:0" << "\n";
+//	}
+//	if (unSatBranch) {
+//		ss << "unSatCost:" << unSatCost / unSatBranch << "\n";
+//	} else {
+//		ss << "unSatCost:0" << "\n";
+//	}
+//	if (testedTraceList.size()) {
+//		ss << "uunSatBranch:" << uunSatBranch * 1.0 / testedTraceList.size()  << "\n";
+//	} else {
+//		ss << "uunSatBranch:0" << "\n";
+//	}
 	ss << "SolvingCost:" << solvingCost << "\n";
 	ss << "RunningCost:" << runningCost << "\n";
 	ss << "inputCost:" << inputCost << "\n";

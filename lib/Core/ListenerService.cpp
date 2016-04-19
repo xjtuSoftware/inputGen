@@ -147,48 +147,48 @@ void ListenerService::endControl(Executor* executor){
 		//comment out to execute the input generate listener.
 //		markBrOpGloabl(executor);
 		Encode encode(&rdManager);
-		std::cerr << "listener read set size:" << rdManager.getCurrentTrace()->readSet.size() << std::endl;
-		std::map<std::string, std::vector<Event *> >::iterator itr = rdManager.getCurrentTrace()->readSet.begin(),
-				ier = rdManager.getCurrentTrace()->readSet.end();
-		unsigned cntR = 0;
-		for (; itr != ier; itr++) {
-			std::cerr << "var Name : " << itr->first << std::endl;
-			cntR += itr->second.size();
-		}
-		std::cerr << "size = " << cntR << std::endl;
-		std::cout << "listener write set size:" << rdManager.getCurrentTrace()->writeSet.size() << std::endl;
-		std::map<std::string, std::vector<Event *> >::iterator itw = rdManager.getCurrentTrace()->writeSet.begin(),
-					iew = rdManager.getCurrentTrace()->writeSet.end();
-			unsigned cntW = 0;
-			for (; itw != iew; itw++) {
-				std::cerr << "var Name : " << itw->first << std::endl;
-				cntW += itw->second.size();
-			}
-		std::cerr << "size = " << cntW << std::endl;
+//		std::cerr << "listener read set size:" << rdManager.getCurrentTrace()->readSet.size() << std::endl;
+//		std::map<std::string, std::vector<Event *> >::iterator itr = rdManager.getCurrentTrace()->readSet.begin(),
+//				ier = rdManager.getCurrentTrace()->readSet.end();
+//		unsigned cntR = 0;
+//		for (; itr != ier; itr++) {
+//			std::cerr << "var Name : " << itr->first << std::endl;
+//			cntR += itr->second.size();
+//		}
+//		std::cerr << "size = " << cntR << std::endl;
+//		std::cout << "listener write set size:" << rdManager.getCurrentTrace()->writeSet.size() << std::endl;
+//		std::map<std::string, std::vector<Event *> >::iterator itw = rdManager.getCurrentTrace()->writeSet.begin(),
+//					iew = rdManager.getCurrentTrace()->writeSet.end();
+//			unsigned cntW = 0;
+//			for (; itw != iew; itw++) {
+//				std::cerr << "var Name : " << itw->first << std::endl;
+//				cntW += itw->second.size();
+//			}
+//		std::cerr << "size = " << cntW << std::endl;
 		encode.buildifAndassert();
 
 		DefUseBuilder duBuilder(rdManager, encode);
 		duBuilder.buildAllDefUse();
-		string ErrorInfo;
-		raw_fd_ostream out_to_file("./output_info/first.txt", ErrorInfo, 0x0202);
-		stringstream duss;
-		for (unsigned i = 0; i < rdManager.explicitDefUse_pre.size(); i++) {
-			duss << " i = " << i << "\n";
-			if (rdManager.explicitDefUse_pre[i]->pre != NULL) {
-				duss << rdManager.explicitDefUse_pre[i]->pre->toString() << " ";
-			}
-				duss << rdManager.explicitDefUse_pre[i]->post->toString() << "\n";
-
-
-			if (rdManager.explicitDefUse_pre[i]->pre == NULL) {
-				duss << "NULL " << " ";
-			} else {
-				duss << rdManager.explicitDefUse_pre[i]->pre->inst->info->assemblyLine << " ";
-			}
-				duss << rdManager.explicitDefUse_pre[i]->post->inst->info->assemblyLine << "\n";
-		}
-		out_to_file << duss.str();
-		out_to_file.close();
+//		string ErrorInfo;
+//		raw_fd_ostream out_to_file("./output_info/first.txt", ErrorInfo, 0x0202);
+//		stringstream duss;
+//		for (unsigned i = 0; i < rdManager.explicitDefUse_pre.size(); i++) {
+//			duss << " i = " << i << "\n";
+//			if (rdManager.explicitDefUse_pre[i]->pre != NULL) {
+//				duss << rdManager.explicitDefUse_pre[i]->pre->toString() << " ";
+//			}
+//				duss << rdManager.explicitDefUse_pre[i]->post->toString() << "\n";
+//
+//
+//			if (rdManager.explicitDefUse_pre[i]->pre == NULL) {
+//				duss << "NULL " << " ";
+//			} else {
+//				duss << rdManager.explicitDefUse_pre[i]->pre->inst->info->assemblyLine << " ";
+//			}
+//				duss << rdManager.explicitDefUse_pre[i]->post->inst->info->assemblyLine << "\n";
+//		}
+//		out_to_file << duss.str();
+//		out_to_file.close();
 		std::cerr << "covered du : " << rdManager.explicitDefUse_pre.size() << endl;
 		std::cerr << "compute du : " << rdManager.coveredDefUse_pre.size() << endl;
 //		encode.getPrefixForDefUse();
@@ -643,7 +643,9 @@ void ListenerService::getMPFromBlockPair(Executor *executor) {
 			}
 		}
 	}
+
 	rdManager.allMP = rdManager.MP.size();
+//	rdManager.allMP = tnpCnt;
 //	std::multimap<std::string, std::string>::iterator mmit = rdManager.MP.begin(),
 //			mmie = rdManager.MP.end();
 //
