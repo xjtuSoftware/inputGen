@@ -637,13 +637,24 @@ void ListenerService::getMPFromBlockPair(Executor *executor) {
 				rdManager.MP.insert(std::make_pair(branchName1, branchName2));
 				rdManager.MP.insert(std::make_pair(branchName2, branchName1));
 
-//				std::cerr << "MP first : " << branchName1 <<
-//						", second : " << branchName2 << endl;
+//				std::cerr << branchName1 << " " << branchName2 << endl;
+//				std::cerr << branchName2 << " " << branchName1 << endl;
+
+//				std::cerr << "MP first : " << branchName1 << endl;
+//				for (std::set<std::string>::iterator it = nameSet1.begin(),
+//						ie = nameSet1.end(); it != ie; it++) {
+//					std::cerr << *it << " ";
+//				}
+//				std::cerr <<"\nsecond : " << branchName2 << endl;
+//				for (std::set<std::string>::iterator it = nameSet2.begin(),
+//						ie = nameSet2.end(); it != ie; it++) {
+//					std::cerr << *it << " ";
+//				}
+//				std::cerr << "\n";
 //				std::cerr << "MP size = " << rdManager.MP.size() << endl;
 			}
 		}
 	}
-
 	rdManager.allMP = rdManager.MP.size();
 //	rdManager.allMP = tnpCnt;
 //	std::multimap<std::string, std::string>::iterator mmit = rdManager.MP.begin(),

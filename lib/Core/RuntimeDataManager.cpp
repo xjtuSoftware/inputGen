@@ -44,6 +44,13 @@ RuntimeDataManager::RuntimeDataManager() :
 RuntimeDataManager::~RuntimeDataManager() {
 	// TODO Auto-generated destructor stub
 
+//	std::multimap<std::string, std::string>::iterator mit = MP.begin(),
+//			mie = MP.end();
+//
+//	for (; mit != mie; mit++) {
+//		std::cerr << mit->first << " " << mit->second << endl;
+//	}
+
 	string ErrorInfo;
 	raw_fd_ostream out_to_file("./output_info/statics.txt", ErrorInfo, 0x0202);
 	stringstream ss;
@@ -96,6 +103,9 @@ RuntimeDataManager::~RuntimeDataManager() {
 	ss << "explicit def-use size:" << this->explicitDefUse_pre.size() << "\n";
 	ss << "implicit def-use size:" << this->implicitDefUse_pre.size() << "\n";
 	ss << "unsolved def-use size:" << this->unsolvedDefUse_pre.size() << "\n";
+	ss << "multi read: " << getReadFromMultipleThread() << "\n";
+	ss << "same thread du: " << getSingleDefUseSize() << "\n";
+	ss << "diff thread du: " << getMultipleDefUseSize() << "\n";
 	out_to_file << ss.str();
 	out_to_file.close();
 
@@ -241,6 +251,78 @@ void RuntimeDataManager::printAllTrace(ostream &out) {
 
 int RuntimeDataManager::getPrefixSetSize() {
 	return scheduleSet.size();
+}
+
+unsigned RuntimeDataManager::getSingleDefUseSize() {
+	unsigned cnt = 0;
+	std::vector<DefUse*>::iterator vIteBeg = coveredDefUse_pre.begin();
+	std::vector<DefUse*>::iterator vIteEnd = coveredDefUse_pre.end();
+	for(; vIteBeg != vIteEnd; ++vIteBeg)
+		if((*vIteBeg)->pre != NULL)
+			if((*vIteBeg)->pre->threadId == (*vIteBeg)->post->threadId)
+				++cnt;
+	return cnt;
+}
+
+unsigned RuntimeDataManager::getMultipleDefUseSize(){
+	return coveredDefUse_pre.size() - getSingleDefUseSize();
+}
+
+unsigned RuntimeDataManager::getReadFromMultipleThread() {
+	unsigned cnt = 0;
+	std::set<Event*> tmpRead;
+	std::vector<DefUse*>::iterator first = coveredDefUse_pre.begin();
+	std::vector<DefUse*>::iterator last = coveredDefUse_pre.end();
+	for (; first != last; ++first){
+			tmpRead.insert((*first)->post);
+	}
+
+	std::set<Event*>::iterator begSet = tmpRead.begin();
+	std::set<Event*>::iterator endSet = tmpRead.end();
+	for (; begSet != endSet; ++begSet){
+		std::vector<DefUse*>::iterator vIteBeg = coveredDefUse_pre.begin();
+		std::vector<DefUse*>::iterator vIteEnd = coveredDefUse_pre.end();
+		std::vector<DefUse*>::iterator curIte;
+		for(; vIteBeg != vIteEnd; ++vIteBeg){
+			if((*vIteBeg)->post == *begSet){
+				curIte = vIteBeg;
+				++vIteBeg;
+				break;
+			}
+		}
+		for(; vIteBeg != vIteEnd; ++vIteBeg){
+			cout << "/////////////////" << endl;
+			std::cout << (*vIteBeg)->post->toString() << std::endl;
+			std::cout << (*begSet)->toString() << std::endl;
+			if((*vIteBeg)->post == *begSet){
+				cout << "<<<<<<<<<<<<<<<<<<<<" << endl;
+				if((*vIteBeg)->pre == NULL){
+					if((*curIte)->pre != NULL){
+//						curIte = vIteBeg;
+						++cnt;
+						cout << "print cnt1111:" << cnt << endl;
+						break;
+					}
+				} else{
+					if((*curIte)->pre != NULL){
+						if((*curIte)->pre->inst->info->assemblyLine != (*vIteBeg)->pre->inst->info->assemblyLine){
+//							curIte = vIteBeg;
+							++cnt;
+							cout << "print cnt2222:" << cnt << endl;
+							break;
+						}
+					} else{
+//						curIte = vIteBeg;
+						++cnt;
+						cout << "print cnt3333:" << cnt << endl;
+						break;
+					}
+				}
+			}
+		}
+		cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << endl;
+	}
+	return cnt;
 }
 
 }

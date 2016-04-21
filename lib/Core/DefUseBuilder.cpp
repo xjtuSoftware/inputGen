@@ -22,7 +22,7 @@ using namespace z3;
 #define PRINT_OPERATION_SET_DETAILED 0
 #define PRINT_OPERATION_SET_BRIEFLY 0
 #define PRINT_DEF_USE 0
-#define DELETE_MP_DU 1
+#define DELETE_MP_DU 0
 
 namespace klee {
 
@@ -195,6 +195,7 @@ void DefUseBuilder::buildAndVerifyDefUse(Event* curRead, Event* curWrite,
 		buildExpr_AddAllWrite(curRead, curWrite, iw, defUseExpr);
 //		printDefUse(def_use);
 		if(isValid(curRead, curWrite, defUseExpr)) {
+			printDefUse_ss(def_use);
 			rdManager.coveredDefUse_pre.push_back(def_use);
 			rdManager.implicitDefUse_pre.push_back(def_use);
 			removeFromUnsolved(def_use);
@@ -251,6 +252,7 @@ void DefUseBuilder::buildDefUse(Event* curRead, Event* curWrite,
 #endif
 //		std::cout << "just build" << std::endl;
 		if(!isCoveredPrePath(def_use)){
+			printDefUse_ss(def_use);
 			rdManager.coveredDefUse_pre.push_back(def_use);
 			return ;
 		}

@@ -42,6 +42,12 @@ public:
 	std::vector<DefUse*> unsolvedDefUse_pre;
 
 public:
+	unsigned getSingleDefUseSize();
+	unsigned getMultipleDefUseSize();
+	unsigned getReadFromMultipleThread();
+
+
+public:
 	//newly added stastic info
 	unsigned allFormulaNum;
 	unsigned allGlobal;
